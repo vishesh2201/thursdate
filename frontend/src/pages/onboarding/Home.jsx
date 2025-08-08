@@ -68,8 +68,6 @@ export default function Home() {
       ContentComponent = MessagesTab;
       break;
     case "profile":
-      // The Profile tab now correctly shows only the ProfileTab component.
-      // Navigation to /settings or /edit-profile is handled by links inside ProfileTab.
       ContentComponent = ProfileTab;
       break;
     default:
