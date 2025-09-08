@@ -120,7 +120,6 @@ export default function GameTab() {
   const currentQuestion = quizQuestions[currentStep];
 
   const handleNext = () => {
-    // Basic validation
     const currentAnswer = answers[currentQuestion.id];
     const isAnswered = currentAnswer && (Array.isArray(currentAnswer) ? currentAnswer.length > 0 : currentAnswer.length > 0);
 
@@ -132,10 +131,7 @@ export default function GameTab() {
     if (currentStep < totalSteps - 1) {
       setCurrentStep(currentStep + 1);
     } else {
-      // Quiz finished, can handle submission or navigation here
       alert("Quiz Finished! Your answers: " + JSON.stringify(answers));
-      // In a real app, you would send 'answers' to the backend
-      // navigate('/quiz-results');
     }
   };
 
