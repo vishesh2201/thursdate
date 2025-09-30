@@ -293,7 +293,7 @@ export default function Referral() {
               </button>
               <button
                 onClick={() => handleContactModalAction('allow')}
-                className="flex-1 py-2 text-blue-400 font-normal text-[17px]"
+                className="flex-1 py-2 text-blue-400 font-normal tsext-[17px]"
               >
                 Allow
               </button>

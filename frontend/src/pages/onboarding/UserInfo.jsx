@@ -4,6 +4,7 @@ import {
   WheelPickerWrapper,
 } from "@ncdai/react-wheel-picker";
 import { useNavigate } from 'react-router-dom';
+import backgroundImage from '/bgs/bg-1.png'; // Adjust path if the image is in a different folder (e.g., '../assets/image_dd0111.jpg')
 import { authAPI, userAPI, uploadAPI } from '../../utils/api';
 
 // Helper to get days in a month (handles leap years)
@@ -17,6 +18,15 @@ const popularLocations = [
   "Rome", "Barcelona", "Amsterdam", "Bangkok", "Cape Town",
   "Dubai", "San Francisco", "Rio de Janeiro", "Kyoto", "Vancouver"
 ];
+
+// --- Custom Tailwind/CSS Overrides for Glassmorphism ---
+const GLASS_BACKGROUND = 'bg-white/10';
+const INPUT_GLASS = 'bg-white/20 backdrop-blur-sm placeholder-white/80 text-white border-white/30';
+const BUTTON_GLASS_ACTIVE = 'bg-white/30 backdrop-blur-md text-white border border-white/40 shadow-lg';
+const BUTTON_GLASS_INACTIVE = 'bg-white/10 text-white/50 cursor-not-allowed border border-white/20';
+const CARD_GLASS_ACTIVE = 'bg-white/20 backdrop-blur-lg border border-white/30 text-white shadow-xl';
+const CARD_GLASS_INACTIVE = 'bg-white/10 backdrop-blur-md border border-white/10 text-white/70';
+// ---
 
 export default function UserInfo() {
   const [step, setStep] = useState(1);
@@ -130,8 +140,6 @@ export default function UserInfo() {
     setStep(step - 1);
   };
 
-  // Remove handleVerificationConfirm and handleVerificationEdit
-
   // Generate options for the WheelPicker components
   const dayOptions = useMemo(() => {
     const days = [];
@@ -157,10 +165,11 @@ export default function UserInfo() {
   const yearOptions = useMemo(() => {
     const years = [];
     const currentYear = new Date().getFullYear();
-    for (let i = currentYear - 120; i <= currentYear + 1; i++) {
+    // Assuming the user needs to select a birth year up to 120 years ago
+    for (let i = currentYear - 120; i <= currentYear; i++) {
       years.push({ label: String(i), value: String(i) });
     }
-    return years;
+    return years.reverse(); // Displaying newest years first
   }, []);
 
   const handleDateConfirm = () => {
@@ -255,10 +264,8 @@ export default function UserInfo() {
   };
 
   const getNextButtonText = () => {
-    return "Next";
+    return step === totalSteps ? "Finish" : "Next";
   };
-
-  // Remove VerificationPopup component
 
   // Profile picture upload handlers
   const handlePicInput = async (e) => {
@@ -278,544 +285,577 @@ export default function UserInfo() {
   };
 
   return (
-    <div className="h-screen bg-white px-6 pt-10 flex flex-col font-sans">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <button
-          onClick={handleBack}
-          className="w-6 h-6 flex items-center justify-center"
-        >
-          <img src="/backarrow.svg" alt="Back" width={24} height={24} />
-        </button>
-        <div className="text-gray-400 text-[14px] font-semibold mx-auto">
-          ThursDate.
-        </div>
-        <div style={{ width: 24 }}></div>
-      </div>
-
-      {/* Top Progress Bar */}
-      <div className="w-full bg-gray-200 rounded-full h-1.5 mb-6">
-        <div
-          className="bg-[#222222] h-1.5 rounded-full transition-all duration-300"
-          style={{ width: `${progress}%` }}
-        ></div>
-      </div>
-
-      {/* Step 1: Name Details */}
-      {step === 1 && (
-        <>
-          <h1 className="text-xl font-semibold mb-4">Let's start with your Full name.</h1>
-          <label htmlFor="firstName" className="text-sm font-medium text-gray-700 mb-1">First Name</label>
-          <div className="flex gap-2 mb-4">
-            <input
-              type="text"
-              id="firstName"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              placeholder="First name"
-              className="flex-1 px-4 py-3 border border-gray-200 rounded-lg text-sm"
-            />
-          </div>
-          <label htmlFor="lastName" className="text-sm font-medium text-gray-700 mb-1">Last Name</label>
-          <input
-            type="text"
-            id="lastName"
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-            placeholder="Last name"
-            className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm mb-6"
-          />
+    // Set the overall background to the provided image and make content a glass card
+    <div 
+      className="h-screen flex flex-col font-sans"
+      style={{
+        backgroundImage: `url(${backgroundImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}
+    >
+      {/* Overlay for a slight darkening effect on the background image */}
+      <div className="absolute inset-0 bg-black/30 z-0"></div>
+      
+      {/* Main Content Container with Glassmorphism Effect */}
+      <div className={`relative z-10 p-6 pt-10 flex flex-col flex-grow ${GLASS_BACKGROUND}`}>
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
           <button
-            disabled={getNextButtonDisabled()}
-            onClick={handleNext}
-            className={`w-full py-4 rounded-xl text-white font-medium text-sm ${
-              getNextButtonDisabled() ? "bg-gray-300 cursor-not-allowed" : "bg-[#222222]"
-            }`}
+            onClick={handleBack}
+            className="w-8 h-8 flex items-center justify-center p-1 rounded-full bg-white/20 backdrop-blur-sm text-white"
           >
-            {getNextButtonText()}
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
           </button>
-        </>
-      )}
+          <div className="text-white/80 text-[24px] font-semibold mx-auto">
+            Sundate.
+          </div>
+          <div style={{ width: 24 }}></div>
+        </div>
 
-      {/* Step 2: Gender Details */}
-      {step === 2 && (
-        <>
-          <h1 className="text-xl font-semibold mb-6">
-            Which gender best describes you?
-          </h1>
-          {[
-            "Woman",
-            "Man",
-            "Non-binary",
-            "Other",
-          ].map((option) => (
-            <label
-              key={option}
-              className="flex items-center justify-between border border-gray-200 rounded-lg px-4 py-3 mb-3 cursor-pointer"
-            >
-              <span>{option}</span>
+        {/* Top Progress Bar */}
+        <div className="w-full bg-white/30 rounded-full h-1.5 mb-8">
+          <div
+            className="bg-white h-1.5 rounded-full transition-all duration-300 shadow-md"
+            style={{ width: `${progress}%` }}
+          ></div>
+        </div>
+
+        {/* Dynamic Step Content */}
+        <div className="flex flex-col flex-grow">
+          
+          {/* Step 1: Name Details */}
+          {step === 1 && (
+            <div className="flex flex-col flex-grow">
+              <h1 className="text-2xl font-semibold mb-6 text-white drop-shadow-md">Let's start with your Full name.</h1>
+              <label htmlFor="firstName" className="text-sm font-medium text-white/90 mb-1">First Name</label>
+              <div className="flex gap-2 mb-4">
+                <input
+                  type="text"
+                  id="firstName"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="First name"
+                  className={`flex-1 px-4 py-3 border rounded-xl text-sm transition ${INPUT_GLASS}`}
+                />
+              </div>
+              <label htmlFor="lastName" className="text-sm font-medium text-white/90 mb-1">Last Name</label>
               <input
-                type="radio"
-                name="gender"
-                value={option}
-                checked={gender === option}
-                onChange={() => {
-                  setGender(option);
-                  // Only show the "Other" specific options if "Other" is selected
-                  setShowOtherOptions(option === "Other");
-                  // Clear customGender if "Other" is deselected
-                  if (option !== "Other") {
-                    setCustomGender("");
-                  }
-                }}
-                className="accent-[#222222]"
+                type="text"
+                id="lastName"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="Last name"
+                className={`w-full px-4 py-3 border rounded-xl text-sm mb-auto transition ${INPUT_GLASS}`}
               />
-            </label>
-          ))}
+              <button
+                disabled={getNextButtonDisabled()}
+                onClick={handleNext}
+                className={`w-full py-4 rounded-xl font-medium text-lg transition ${
+                  getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
+                }`}
+              >
+                {getNextButtonText()}
+              </button>
+            </div>
+          )}
 
-          {/* Display other gender options when 'Other' is selected */}
-          {showOtherOptions && (
-            <div className="border border-gray-200 rounded-lg p-4 mt-3">
-              <p className="text-sm font-semibold mb-3">Please specify:</p>
+          {/* Step 2: Gender Details */}
+          {step === 2 && (
+            <div className="flex flex-col flex-grow">
+              <h1 className="text-2xl font-semibold mb-6 text-white drop-shadow-md">
+                Which gender best describes you?
+              </h1>
               {[
-                "Non-Binary", // This seems to be duplicated from the main options, but keeping it as per image
-                "Genderqueer",
-                "Agender",
-                "Bigender",
-                "Genderfluid",
-                "Transgender",
-                "Transmasculine",
-                "Transfeminine",
-                "Two-Spirit",
-                "Intersex",
-                "Demiboy",
-                "Demigirl",
-                "Third Gender",
-              ].map((otherOption) => (
+                "Woman",
+                "Man",
+                "Non-binary",
+                "Other",
+              ].map((option) => (
                 <label
-                  key={otherOption}
-                  className="flex items-center justify-between py-2 cursor-pointer"
+                  key={option}
+                  className={`flex items-center justify-between rounded-xl px-4 py-4 mb-3 cursor-pointer transition ${
+                    gender === option ? CARD_GLASS_ACTIVE : CARD_GLASS_INACTIVE
+                  }`}
                 >
-                  <span>{otherOption}</span>
+                  <span className="font-medium">{option}</span>
                   <input
                     type="radio"
-                    name="customGenderOption" // Use a different name for the nested radio buttons
-                    value={otherOption}
-                    checked={customGender === otherOption}
-                    onChange={() => setCustomGender(otherOption)}
-                    className="accent-[#222222]"
+                    name="gender"
+                    value={option}
+                    checked={gender === option}
+                    onChange={() => {
+                      setGender(option);
+                      setShowOtherOptions(option === "Other");
+                      if (option !== "Other") {
+                        setCustomGender("");
+                      }
+                    }}
+                    // Using a custom ring for radio button to match theme
+                    className="h-5 w-5 border-2 border-white/50 checked:bg-white checked:ring-white/80 checked:ring-2 appearance-none rounded-full cursor-pointer transition"
+                    style={{ backgroundColor: gender === option ? 'white' : 'transparent' }}
                   />
                 </label>
               ))}
-            </div>
-          )}
 
-          <button
-            disabled={getNextButtonDisabled()}
-            onClick={handleNext}
-            className={`w-full py-4 mb-5 rounded-xl text-white font-medium text-sm ${
-              getNextButtonDisabled() ? "bg-gray-300 cursor-not-allowed" : "bg-[#222222]"
-            } mt-4`}
-          >
-            {getNextButtonText()}
-          </button>
-        </>
-      )}
-
-      {/* Step 3: Age Details */}
-      {step === 3 && (
-        <>
-          <h1 className="text-xl font-semibold mb-6">What's your Age?</h1>
-          <div
-            className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm mb-2 flex justify-between items-center cursor-pointer"
-            onClick={() => {
-              setShowDatePicker(true);
-            }}
-          >
-            {dob ? new Date(dob).toLocaleDateString('en-GB') : "DD/MM/YYYY"}
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-calendar"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
-          </div>
-          <p className="text-xs text-gray-400 mb-6">
-            Must be at least 30 years old
-          </p>
-          <button
-            disabled={getNextButtonDisabled()}
-            onClick={handleNext}
-            className={`w-full py-4 rounded-xl text-white font-medium text-sm ${
-              getNextButtonDisabled() ? "bg-gray-300 cursor-not-allowed" : "bg-[#222222]"
-            }`}
-          >
-            {getNextButtonText()}
-          </button>
-
-          {/* Custom Date Picker Overlay */}
-          {showDatePicker && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50">
-              <div className="w-full bg-white p-4 rounded-t-xl shadow-lg relative">
-                <div className="flex justify-between items-center mb-4">
-                  <button onClick={() => setShowDatePicker(false)} className="text-blue-500">Cancel</button>
-                  <div className="font-semibold">Select Date</div>
-                  <button onClick={handleDateConfirm} className="text-blue-500 font-semibold">Done</button>
+              {/* Display other gender options when 'Other' is selected */}
+              {showOtherOptions && (
+                <div className={`rounded-xl p-4 mt-4 transition ${CARD_GLASS_ACTIVE}`}>
+                  <p className="text-sm font-semibold mb-3 text-white/90">Please specify:</p>
+                  <div className="max-h-32 overflow-y-auto">
+                    {[
+                      "Non-Binary",
+                      "Genderqueer",
+                      "Agender",
+                      "Bigender",
+                      "Genderfluid",
+                      "Transgender",
+                      "Transmasculine",
+                      "Transfeminine",
+                      "Two-Spirit",
+                      "Intersex",
+                      "Demiboy",
+                      "Demigirl",
+                      "Third Gender",
+                    ].map((otherOption) => (
+                      <label
+                        key={otherOption}
+                        className="flex items-center justify-between py-2 cursor-pointer text-sm text-white/90"
+                      >
+                        <span>{otherOption}</span>
+                        <input
+                          type="radio"
+                          name="customGenderOption"
+                          value={otherOption}
+                          checked={customGender === otherOption}
+                          onChange={() => setCustomGender(otherOption)}
+                          className="h-4 w-4 border border-white/50 checked:bg-white checked:ring-white/80 checked:ring-1 appearance-none rounded-full cursor-pointer"
+                          style={{ backgroundColor: customGender === otherOption ? 'white' : 'transparent' }}
+                        />
+                      </label>
+                    ))}
+                  </div>
                 </div>
+              )}
 
-                <WheelPickerWrapper
-                  className="flex w-full justify-center h-48 py-2 relative"
-                  style={{
-                    backgroundImage: 'linear-gradient(to bottom, transparent, rgba(0,0,0,0.05) 50%, transparent)',
-                    backgroundSize: '100% 2px',
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'center',
-                  }}
+              <div className="mt-auto pt-6">
+                <button
+                  disabled={getNextButtonDisabled()}
+                  onClick={handleNext}
+                  className={`w-full py-4 rounded-xl font-medium text-lg transition ${
+                    getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
+                  }`}
                 >
-                  <WheelPicker
-                    options={dayOptions}
-                    value={pickerDay}
-                    onValueChange={(val) => setPickerDay(updatePickerDayBasedOnMonthYear(pickerYear, pickerMonth, val))}
-                    classNames={{
-                      optionItem: "text-gray-400",
-                      highlightWrapper: "bg-gray-100 rounded-md",
-                      highlightItem: "text-gray-800 font-semibold",
-                    }}
-                    infinite={true}
-                  />
-                  <WheelPicker
-                    options={monthOptions}
-                    value={pickerMonth}
-                    onValueChange={(val) => {
-                      setPickerMonth(val);
-                      setPickerDay(updatePickerDayBasedOnMonthYear(pickerYear, val, pickerDay));
-                    }}
-                    classNames={{
-                      optionItem: "text-gray-400",
-                      highlightWrapper: "bg-gray-100 rounded-md",
-                      highlightItem: "text-gray-800 font-semibold",
-                    }}
-                    infinite={true}
-                  />
-                  <WheelPicker
-                    options={yearOptions}
-                    value={pickerYear}
-                    onValueChange={(val) => {
-                      setPickerYear(val);
-                      setPickerDay(updatePickerDayBasedOnMonthYear(val, pickerMonth, pickerDay));
-                    }}
-                    classNames={{
-                      optionItem: "text-gray-400",
-                      highlightWrapper: "bg-gray-100 rounded-md",
-                      highlightItem: "text-gray-800 font-semibold",
-                    }}
-                    infinite={false}
-                  />
-                </WheelPickerWrapper>
+                  {getNextButtonText()}
+                </button>
               </div>
             </div>
           )}
-        </>
-      )}
 
-      {/* Step 4: Current Location Details */}
-      {step === 4 && (
-        <>
-          <h1 className="text-xl font-semibold mb-4">Where are you living currently?</h1>
-          <p className="text-sm text-gray-500 mb-6">This will help users see which city you are currently living in so they can connect accordingly.</p>
-          <div className="relative mb-6">
-            <input
-              type="text"
-              value={currentLocation}
-              onChange={(e) => setCurrentLocation(e.target.value)}
-              placeholder="Andheri"
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm pr-10"
-            />
-            {currentLocation && (
-              <button
-                onClick={() => setCurrentLocation("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg"
-              >
-                ×
-              </button>
-            )}
-          </div>
-
-          <button
-            disabled={getNextButtonDisabled()}
-            onClick={handleNext}
-            className={`w-full py-4 rounded-xl text-white font-medium text-sm ${
-              getNextButtonDisabled() ? "bg-gray-300 cursor-not-allowed" : "bg-[#222222]"
-            }`}
-          >
-            {getNextButtonText()}
-          </button>
-        </>
-      )}
-
-      {/* Step 5: Favourite Travel Destination */}
-      {step === 5 && (
-        <>
-          <h1 className="text-xl font-semibold mb-4">What is your favourite travel destination?</h1>
-          <p className="text-sm text-gray-500 mb-6">Enter your dream destination</p>
-          <div className="relative mb-6">
-            <input
-              type="text"
-              value={favouriteTravelDestination}
-              onChange={(e) => setFavouriteTravelDestination(e.target.value)}
-              placeholder="e.g., Paris"
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm pr-10"
-            />
-            {favouriteTravelDestination && (
-              <button
-                onClick={() => setFavouriteTravelDestination("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg"
-              >
-                ×
-              </button>
-            )}
-          </div>
-          <button
-            disabled={getNextButtonDisabled()}
-            onClick={handleNext}
-            className={`w-full py-4 rounded-xl text-white font-medium text-sm ${
-              getNextButtonDisabled() ? "bg-gray-300 cursor-not-allowed" : "bg-[#222222]"
-            }`}
-          >
-            {getNextButtonText()}
-          </button>
-        </>
-      )}
-
-      {/* Step 6: Last Holiday Places - Tag Input with Autocomplete */}
-      {step === 6 && (
-        <>
-          <h1 className="text-xl font-semibold mb-4">Where did you go on your last holiday?</h1>
-          <p className="text-sm text-gray-500 mb-6">Enter minimum 3 places</p>
-
-          {/* Display existing tags */}
-          <div className="flex flex-wrap gap-2 mb-4">
-            {lastHolidayPlaces.map((place) => (
+          {/* Step 3: Age Details */}
+          {step === 3 && (
+            <div className="flex flex-col flex-grow">
+              <h1 className="text-2xl font-semibold mb-6 text-white drop-shadow-md">What's your Age?</h1>
               <div
-                key={place.id}
-                className="bg-[#222222] text-white px-3 py-2 rounded-lg flex items-center text-sm"
-              >
-                <span>{place.name}</span>
-                {place.details && (
-                  <span className="text-gray-300 ml-1 text-xs">({place.details})</span>
-                )}
-                <button
-                  onClick={() => handleRemoveLastHolidayPlace(place.id)}
-                  className="ml-2 text-white opacity-70 hover:opacity-100"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-
-          {/* Input for new tags with autocomplete */}
-          <div className="relative mb-6">
-            <input
-              type="text"
-              value={currentLastHolidayPlaceInput}
-              onChange={(e) => setCurrentLastHolidayPlaceInput(e.target.value)}
-              onKeyDown={handleAddLastHolidayPlace}
-              placeholder="Type a place & press Enter (e.g., Paris)"
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm pr-10"
-            />
-            {currentLastHolidayPlaceInput && (
-              <button
+                className={`w-full px-4 py-4 rounded-xl text-base mb-2 flex justify-between items-center cursor-pointer transition ${INPUT_GLASS}`}
                 onClick={() => {
-                  setCurrentLastHolidayPlaceInput("");
-                  setLastHolidaySuggestions([]);
+                  setShowDatePicker(true);
                 }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg"
               >
-                ×
-              </button>
-            )}
-            {lastHolidaySuggestions.length > 0 && (
-              <ul className="absolute z-10 w-full bg-white border border-gray-200 rounded-lg mt-1 max-h-40 overflow-y-auto">
-                {lastHolidaySuggestions.map((suggestion, index) => (
-                  <li
-                    key={index}
-                    onClick={() => handleLastHolidaySuggestionClick(suggestion)}
-                    className="px-4 py-2 text-sm hover:bg-gray-100 cursor-pointer"
-                  >
-                    {suggestion}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <button
-            disabled={getNextButtonDisabled()}
-            onClick={handleNext}
-            className={`w-full py-4 rounded-xl text-white font-medium text-sm ${
-              getNextButtonDisabled() ? "bg-gray-300 cursor-not-allowed" : "bg-[#222222]"
-            } mt-2`}
-          >
-            {getNextButtonText()}
-          </button>
-        </>
-      )}
-
-      {/* Step 7: Favourite Places to Go To - Tag Input with Autocomplete */}
-      {step === 7 && (
-        <>
-          <h1 className="text-xl font-semibold mb-4">What are your three favourite places to go to?</h1>
-          <p className="text-sm text-gray-500 mb-6">Enter minimum 3 places</p>
-
-          {/* Display existing tags */}
-          <div className="flex flex-wrap gap-2 mb-4">
-            {favouritePlacesToGo.map((place) => (
-              <div
-                key={place.id}
-                className="bg-[#222222] text-white px-3 py-2 rounded-lg flex items-center text-sm"
-              >
-                <span>{place.name}</span>
-                {place.details && (
-                  <span className="text-gray-300 ml-1 text-xs">({place.details})</span>
-                )}
-                <button
-                  onClick={() => handleRemoveFavouritePlaceToGo(place.id)}
-                  className="ml-2 text-white opacity-70 hover:opacity-100"
-                >
-                  ×
-                </button>
+                <span className="font-medium">{dob ? new Date(dob).toLocaleDateString('en-GB') : "DD/MM/YYYY"}</span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-calendar text-white/70"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
               </div>
-            ))}
-          </div>
-
-          {/* Input for new tags with autocomplete */}
-          <div className="relative mb-6">
-            <input
-              type="text"
-              value={currentFavouritePlaceToGoInput}
-              onChange={(e) => setCurrentFavouritePlaceToGoInput(e.target.value)}
-              onKeyDown={handleAddFavouritePlaceToGo}
-              placeholder="Type a place & press Enter (e.g., Paris)"
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm pr-10"
-            />
-            {currentFavouritePlaceToGoInput && (
+              <p className={`text-xs mb-auto text-white/60 ${isStepThreeValid ? 'text-white/60' : 'text-red-300'}`}>
+                {isStepThreeValid ? 'You meet the minimum age requirement.' : 'Must be at least 30 years old.'}
+              </p>
               <button
-                onClick={() => {
-                  setCurrentFavouritePlaceToGoInput("");
-                  setFavouritePlaceSuggestions([]);
-                }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg"
+                disabled={getNextButtonDisabled()}
+                onClick={handleNext}
+                className={`w-full py-4 rounded-xl font-medium text-lg transition ${
+                  getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
+                }`}
               >
-                ×
+                {getNextButtonText()}
               </button>
-            )}
-            {favouritePlaceSuggestions.length > 0 && (
-              <ul className="absolute z-10 w-full bg-white border border-gray-200 rounded-lg mt-1 max-h-40 overflow-y-auto">
-                {favouritePlaceSuggestions.map((suggestion, index) => (
-                  <li
-                    key={index}
-                    onClick={() => handleFavouritePlaceSuggestionClick (suggestion)}
-                    className="px-4 py-2 text-sm hover:bg-gray-100 cursor-pointer"
-                  >
-                    {suggestion}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <button
-            disabled={getNextButtonDisabled()}
-            onClick={handleNext}
-            className={`w-full py-4 rounded-xl text-white font-medium text-sm ${
-              getNextButtonDisabled() ? "bg-gray-300 cursor-not-allowed" : "bg-[#222222]"
-            } mt-2`}
-          >
-            {getNextButtonText()}
-          </button>
-        </>
-      )}
 
-      {/* Step 8: Profile Picture Upload */}
-      {step === 8 && (
-        <>
-          <h1 className="text-xl font-semibold mb-2">Face Verification</h1>
-          <p className="text-sm text-gray-500 mb-6">Upload a clear face photo.<br/>This won’t appear on your profile—it’s just to keep our community safe.</p>
-          <div className="flex flex-col items-center mb-6">
-            <div
-              className="w-32 h-32 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden mb-4 border-2 border-gray-200 relative cursor-pointer"
-              onClick={() => setShowPicModal(true)}
-              style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}
-            >
-              {profilePicUrl ? (
-                <img src={profilePicUrl} alt="Profile Preview" className="object-cover w-full h-full" />
-              ) : (
-                <span className="text-4xl text-gray-400">+</span>
-              )}
-              {uploadingPic && (
-                <div className="absolute inset-0 bg-white bg-opacity-70 flex items-center justify-center">
-                  <span className="text-xs text-gray-500">Uploading...</span>
+              {/* Custom Date Picker Overlay */}
+              {showDatePicker && (
+                <div className="fixed inset-0 bg-black/60 flex items-end justify-center z-50">
+                  <div className={`w-full ${GLASS_BACKGROUND} p-4 rounded-t-3xl backdrop-blur-xl shadow-2xl relative`}>
+                    <div className="flex justify-between items-center mb-4 text-white">
+                      <button onClick={() => setShowDatePicker(false)} className="text-white/70 font-medium">Cancel</button>
+                      <div className="font-semibold text-lg">Select Date</div>
+                      <button onClick={handleDateConfirm} className="text-white font-semibold">Done</button>
+                    </div>
+
+                    <WheelPickerWrapper
+                      className="flex w-full justify-center h-48 py-2 relative"
+                      style={{
+                        // A more subtle highlight line for the date picker
+                        backgroundImage: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.1) 50%, transparent), linear-gradient(to top, transparent, rgba(255,255,255,0.1) 50%, transparent)',
+                        backgroundSize: '100% 1px',
+                        backgroundRepeat: 'repeat-x',
+                        backgroundPosition: 'center',
+                      }}
+                    >
+                      <WheelPicker
+                        options={dayOptions}
+                        value={pickerDay}
+                        onValueChange={(val) => setPickerDay(updatePickerDayBasedOnMonthYear(pickerYear, pickerMonth, val))}
+                        classNames={{
+                          optionItem: "text-white/40",
+                          highlightWrapper: "bg-white/10 rounded-md",
+                          highlightItem: "text-white font-semibold",
+                        }}
+                        infinite={true}
+                      />
+                      <WheelPicker
+                        options={monthOptions}
+                        value={pickerMonth}
+                        onValueChange={(val) => {
+                          setPickerMonth(val);
+                          setPickerDay(updatePickerDayBasedOnMonthYear(pickerYear, val, pickerDay));
+                        }}
+                        classNames={{
+                          optionItem: "text-white/40",
+                          highlightWrapper: "bg-white/10 rounded-md",
+                          highlightItem: "text-white font-semibold",
+                        }}
+                        infinite={true}
+                      />
+                      <WheelPicker
+                        options={yearOptions}
+                        value={pickerYear}
+                        onValueChange={(val) => {
+                          setPickerYear(val);
+                          setPickerDay(updatePickerDayBasedOnMonthYear(val, pickerMonth, pickerDay));
+                        }}
+                        classNames={{
+                          optionItem: "text-white/40",
+                          highlightWrapper: "bg-white/10 rounded-md",
+                          highlightItem: "text-white font-semibold",
+                        }}
+                        infinite={false}
+                      />
+                    </WheelPickerWrapper>
+                  </div>
                 </div>
               )}
             </div>
-            <div className="text-xs text-gray-400 text-center">
-              <div className="mb-2 font-semibold">Pro Tip:</div>
-              <ul className="list-disc list-inside text-xs text-gray-400 text-left">
-                <li>Use a well-lit background</li>
-                <li>Look straight at the camera</li>
-                <li>No sunglasses or masks</li>
-              </ul>
-            </div>
-            {picError && <div className="text-red-500 text-xs mt-2">{picError}</div>}
-          </div>
-          <button
-            disabled={getNextButtonDisabled()}
-            onClick={handleNext}
-            className={`w-full py-4 rounded-xl text-white font-medium text-sm ${
-              getNextButtonDisabled() ? "bg-gray-300 cursor-not-allowed" : "bg-[#222222]"
-            }`}
-          >
-            Next
-          </button>
+          )}
 
-          {/* Modal for Gallery/Camera selection */}
-          {showPicModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-40 flex items-end justify-center z-50">
-              <div className="w-full bg-white rounded-t-2xl p-6 pb-8 shadow-lg">
-                <div className="mb-4 text-center font-semibold">Upload a profile picture</div>
-                <div className="flex flex-col gap-3">
-                  <label className="w-full py-3 rounded-xl bg-gray-100 text-center cursor-pointer text-sm font-medium">
-                    Gallery
-                    <input
-                      type="file"
-                      accept="image/*"
-                      style={{ display: 'none' }}
-                      onChange={(e) => {
-                        setShowPicModal(false);
-                        handlePicInput(e);
-                      }}
-                    />
-                  </label>
-                  <label className="w-full py-3 rounded-xl bg-gray-100 text-center cursor-pointer text-sm font-medium">
-                    Camera
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="user"
-                      style={{ display: 'none' }}
-                      onChange={(e) => {
-                        setShowPicModal(false);
-                        handlePicInput(e);
-                      }}
-                    />
-                  </label>
-                </div>
-                <button
-                  className="w-full mt-4 py-2 rounded-xl bg-gray-200 text-gray-700 text-sm font-medium"
-                  onClick={() => setShowPicModal(false)}
-                >
-                  Cancel
-                </button>
+          {/* Step 4: Current Location Details */}
+          {step === 4 && (
+            <div className="flex flex-col flex-grow">
+              <h1 className="text-2xl font-semibold mb-4 text-white drop-shadow-md">Where are you living currently?</h1>
+              <p className="text-sm text-white/70 mb-6">This will help users see which city you are currently living in so they can connect accordingly.</p>
+              <div className="relative mb-auto">
+                <input
+                  type="text"
+                  value={currentLocation}
+                  onChange={(e) => setCurrentLocation(e.target.value)}
+                  placeholder="e.g., Andheri"
+                  className={`w-full px-4 py-3 border rounded-xl text-sm pr-10 ${INPUT_GLASS}`}
+                />
+                {currentLocation && (
+                  <button
+                    onClick={() => setCurrentLocation("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 text-lg transition"
+                  >
+                    ×
+                  </button>
+                )}
               </div>
+
+              <button
+                disabled={getNextButtonDisabled()}
+                onClick={handleNext}
+                className={`w-full py-4 rounded-xl font-medium text-lg transition ${
+                  getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
+                }`}
+              >
+                {getNextButtonText()}
+              </button>
             </div>
           )}
-        </>
-      )}
 
+          {/* Step 5: Favourite Travel Destination */}
+          {step === 5 && (
+            <div className="flex flex-col flex-grow">
+              <h1 className="text-2xl font-semibold mb-4 text-white drop-shadow-md">What is your favourite travel destination?</h1>
+              <p className="text-sm text-white/70 mb-6">Enter your dream destination</p>
+              <div className="relative mb-auto">
+                <input
+                  type="text"
+                  value={favouriteTravelDestination}
+                  onChange={(e) => setFavouriteTravelDestination(e.target.value)}
+                  placeholder="e.g., Paris"
+                  className={`w-full px-4 py-3 border rounded-xl text-sm pr-10 ${INPUT_GLASS}`}
+                />
+                {favouriteTravelDestination && (
+                  <button
+                    onClick={() => setFavouriteTravelDestination("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 text-lg transition"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+              <button
+                disabled={getNextButtonDisabled()}
+                onClick={handleNext}
+                className={`w-full py-4 rounded-xl font-medium text-lg transition ${
+                  getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
+                }`}
+              >
+                {getNextButtonText()}
+              </button>
+            </div>
+          )}
+
+          {/* Step 6: Last Holiday Places - Tag Input with Autocomplete */}
+          {step === 6 && (
+            <div className="flex flex-col flex-grow">
+              <h1 className="text-2xl font-semibold mb-4 text-white drop-shadow-md">Where did you go on your last holiday?</h1>
+              <p className={`text-sm mb-6 ${isStepSixValid ? 'text-white/70' : 'text-red-300'}`}>
+                {isStepSixValid ? 'Great! You can add more if you like.' : 'Enter minimum 3 places'}
+              </p>
+
+              {/* Display existing tags */}
+              <div className="flex flex-wrap gap-2 mb-4 max-h-40 overflow-y-auto">
+                {lastHolidayPlaces.map((place) => (
+                  <div
+                    key={place.id}
+                    className="bg-white/30 backdrop-blur-sm text-white px-3 py-2 rounded-full flex items-center text-sm border border-white/40 shadow-md"
+                  >
+                    <span>{place.name}</span>
+                    {place.details && (
+                      <span className="text-white/80 ml-1 text-xs">({place.details})</span>
+                    )}
+                    <button
+                      onClick={() => handleRemoveLastHolidayPlace(place.id)}
+                      className="ml-2 text-white/80 hover:text-white transition"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Input for new tags with autocomplete */}
+              <div className="relative mb-auto">
+                <input
+                  type="text"
+                  value={currentLastHolidayPlaceInput}
+                  onChange={(e) => setCurrentLastHolidayPlaceInput(e.target.value)}
+                  onKeyDown={handleAddLastHolidayPlace}
+                  placeholder="Type a place & press Enter (e.g., Paris)"
+                  className={`w-full px-4 py-3 border rounded-xl text-sm pr-10 ${INPUT_GLASS}`}
+                />
+                {currentLastHolidayPlaceInput && (
+                  <button
+                    onClick={() => {
+                      setCurrentLastHolidayPlaceInput("");
+                      setLastHolidaySuggestions([]);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 text-lg transition"
+                  >
+                    ×
+                  </button>
+                )}
+                {lastHolidaySuggestions.length > 0 && (
+                  <ul className="absolute z-20 w-full bg-white/40 backdrop-blur-lg border border-white/40 rounded-xl mt-1 max-h-40 overflow-y-auto shadow-xl">
+                    {lastHolidaySuggestions.map((suggestion, index) => (
+                      <li
+                        key={index}
+                        onClick={() => handleLastHolidaySuggestionClick(suggestion)}
+                        className="px-4 py-2 text-sm text-white hover:bg-white/20 cursor-pointer transition"
+                      >
+                        {suggestion}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <button
+                disabled={getNextButtonDisabled()}
+                onClick={handleNext}
+                className={`w-full py-4 rounded-xl font-medium text-lg transition mt-6 ${
+                  getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
+                }`}
+              >
+                {getNextButtonText()}
+              </button>
+            </div>
+          )}
+
+          {/* Step 7: Favourite Places to Go To - Tag Input with Autocomplete */}
+          {step === 7 && (
+            <div className="flex flex-col flex-grow">
+              <h1 className="text-2xl font-semibold mb-4 text-white drop-shadow-md">What are your three favourite places to go to?</h1>
+              <p className={`text-sm mb-6 ${isStepSevenValid ? 'text-white/70' : 'text-red-300'}`}>
+                {isStepSevenValid ? 'Perfect! Time for the final step.' : 'Enter minimum 3 places'}
+              </p>
+
+              {/* Display existing tags */}
+              <div className="flex flex-wrap gap-2 mb-4 max-h-40 overflow-y-auto">
+                {favouritePlacesToGo.map((place) => (
+                  <div
+                    key={place.id}
+                    className="bg-white/30 backdrop-blur-sm text-white px-3 py-2 rounded-full flex items-center text-sm border border-white/40 shadow-md"
+                  >
+                    <span>{place.name}</span>
+                    {place.details && (
+                      <span className="text-white/80 ml-1 text-xs">({place.details})</span>
+                    )}
+                    <button
+                      onClick={() => handleRemoveFavouritePlaceToGo(place.id)}
+                      className="ml-2 text-white/80 hover:text-white transition"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Input for new tags with autocomplete */}
+              <div className="relative mb-auto">
+                <input
+                  type="text"
+                  value={currentFavouritePlaceToGoInput}
+                  onChange={(e) => setCurrentFavouritePlaceToGoInput(e.target.value)}
+                  onKeyDown={handleAddFavouritePlaceToGo}
+                  placeholder="Type a place & press Enter (e.g., Paris)"
+                  className={`w-full px-4 py-3 border rounded-xl text-sm pr-10 ${INPUT_GLASS}`}
+                />
+                {currentFavouritePlaceToGoInput && (
+                  <button
+                    onClick={() => {
+                      setCurrentFavouritePlaceToGoInput("");
+                      setFavouritePlaceSuggestions([]);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 text-lg transition"
+                  >
+                    ×
+                  </button>
+                )}
+                {favouritePlaceSuggestions.length > 0 && (
+                  <ul className="absolute z-20 w-full bg-white/40 backdrop-blur-lg border border-white/40 rounded-xl mt-1 max-h-40 overflow-y-auto shadow-xl">
+                    {favouritePlaceSuggestions.map((suggestion, index) => (
+                      <li
+                        key={index}
+                        onClick={() => handleFavouritePlaceSuggestionClick (suggestion)}
+                        className="px-4 py-2 text-sm text-white hover:bg-white/20 cursor-pointer transition"
+                      >
+                        {suggestion}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <button
+                disabled={getNextButtonDisabled()}
+                onClick={handleNext}
+                className={`w-full py-4 rounded-xl font-medium text-lg transition mt-6 ${
+                  getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
+                }`}
+              >
+                {getNextButtonText()}
+              </button>
+            </div>
+          )}
+
+          {/* Step 8: Profile Picture Upload */}
+          {step === 8 && (
+            <div className="flex flex-col flex-grow items-center">
+              <h1 className="text-2xl font-semibold mb-2 text-white drop-shadow-md">Face Verification</h1>
+              <p className="text-sm text-white/70 mb-6 text-center">Upload a clear face photo.<br/>This won’t appear on your profile—it’s just to keep our community safe.</p>
+              
+              <div className="flex flex-col items-center mb-auto">
+                <div
+                  className="w-36 h-36 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center overflow-hidden mb-4 border-4 border-white/50 relative cursor-pointer shadow-xl transition"
+                  onClick={() => setShowPicModal(true)}
+                >
+                  {profilePicUrl ? (
+                    <img src={profilePicUrl} alt="Profile Preview" className="object-cover w-full h-full" />
+                  ) : (
+                    <span className="text-6xl text-white/70">+</span>
+                  )}
+                  {uploadingPic && (
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center">
+                      <span className="text-sm text-white">Uploading...</span>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="text-xs text-white/60 text-center">
+                  <div className="mb-2 font-semibold text-white/80">Pro Tip:</div>
+                  <ul className="list-disc list-inside text-xs text-white/70 text-left w-max mx-auto">
+                    <li>Use a well-lit background</li>
+                    <li>Look straight at the camera</li>
+                    <li>No sunglasses or masks</li>
+                  </ul>
+                </div>
+                {picError && <div className="text-red-300 text-xs mt-2">{picError}</div>}
+              </div>
+              <button
+                disabled={getNextButtonDisabled()}
+                onClick={handleNext}
+                className={`w-full py-4 rounded-xl font-medium text-lg transition ${
+                  getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
+                }`}
+              >
+                {getNextButtonText()}
+              </button>
+
+              {/* Modal for Gallery/Camera selection (Using a darker Glassmorphism for pop-ups) */}
+              {showPicModal && (
+                <div className="fixed inset-0 bg-black/60 flex items-end justify-center z-50">
+                  <div className={`w-full p-6 pb-8 shadow-2xl rounded-t-3xl bg-black/30 backdrop-blur-xl border-t border-white/20`}>
+                    <div className="mb-4 text-center font-semibold text-white">Upload a profile picture</div>
+                    <div className="flex flex-col gap-3">
+                      {/* Gallery Button - Styled for Glassmorphism */}
+                      <label className="w-full py-3 rounded-xl bg-white/20 backdrop-blur-sm text-center cursor-pointer text-sm font-medium text-white/90 border border-white/30 hover:bg-white/30 transition">
+                        Gallery
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          onChange={(e) => {
+                            setShowPicModal(false);
+                            handlePicInput(e);
+                          }}
+                        />
+                      </label>
+                      {/* Camera Button - Styled for Glassmorphism */}
+                      <label className="w-full py-3 rounded-xl bg-white/20 backdrop-blur-sm text-center cursor-pointer text-sm font-medium text-white/90 border border-white/30 hover:bg-white/30 transition">
+                        Camera
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="user"
+                          style={{ display: 'none' }}
+                          onChange={(e) => {
+                            setShowPicModal(false);
+                            handlePicInput(e);
+                          }}
+                        />
+                      </label>
+                    </div>
+                    {/* Cancel Button - Styled for Glassmorphism */}
+                    <button
+                      className="w-full mt-4 py-3 rounded-xl bg-black/30 backdrop-blur-sm text-white/70 text-sm font-medium border border-white/20 hover:bg-black/40 transition"
+                      onClick={() => setShowPicModal(false)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

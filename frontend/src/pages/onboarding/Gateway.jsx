@@ -21,7 +21,7 @@ export default function Gateway() {
         >
           I want to join
         </button>
-        <button 
+        <button
           onClick={() => navigate("/login")}
           className="w-full py-4 rounded-xl border border-[#222222] bg-white text-[#222222] text-sm font-medium">
           I want to login
