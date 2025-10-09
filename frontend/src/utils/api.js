@@ -1,6 +1,6 @@
 // frontend/src/utils/api.js
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = process.env.BACKEND_API_URL || 'http://localhost:5000/api';
 
 // --- MOCK CONSTANTS & HELPERS ---
 const DUMMY_EMAIL = "sanwari.nair@gmail.com";
