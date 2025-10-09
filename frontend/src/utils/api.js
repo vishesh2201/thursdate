@@ -1,6 +1,8 @@
 // frontend/src/utils/api.js
 
-const API_BASE_URL = process.env.BACKEND_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_BACKEND_API_URL;
+console.log("API_BASE_URL set to:", import.meta.env.VITE_BACKEND_API_URL);
+
 
 // --- MOCK CONSTANTS & HELPERS ---
 const DUMMY_EMAIL = "sanwari.nair@gmail.com";
