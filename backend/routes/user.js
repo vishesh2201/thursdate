@@ -1,3 +1,4 @@
+// backend/routes/user.js
 const express = require('express');
 const pool = require('../config/db');
 const auth = require('../middleware/auth');
