@@ -37,7 +37,8 @@ router.get('/profile', auth, async (req, res) => {
         }
 
         const [users] = await pool.execute(
-            'SELECT id, email, first_name, last_name, gender, dob, current_location, favourite_travel_destination, last_holiday_places, favourite_places_to_go, profile_pic_url, approval, intent, onboarding_complete, is_private FROM users WHERE id = ?',
+            // 🛑 FIX: is_private REMOVED from the SELECT query
+            'SELECT id, email, first_name, last_name, gender, dob, current_location, favourite_travel_destination, last_holiday_places, favourite_places_to_go, profile_pic_url, approval, intent, onboarding_complete FROM users WHERE id = ?',
             [req.user.userId]
         );
         
@@ -47,8 +48,7 @@ router.get('/profile', auth, async (req, res) => {
         
         const user = users[0];
         
-        // 💡 CRITICAL FIX: Add defensive null checks (using || null) for all nullable columns 
-        // and explicitly convert boolean-like fields to proper booleans (using !!).
+        // CRITICAL FIX: Add defensive null checks and boolean coercion.
         const transformedUser = {
             id: user.id,
             email: user.email,
@@ -63,17 +63,16 @@ router.get('/profile', auth, async (req, res) => {
             profilePicUrl: user.profile_pic_url || null,
             intent: safeJsonParse(user.intent, {}),
             onboardingComplete: !!user.onboarding_complete, // Ensure boolean
-            approval: !!user.approval,                     // Ensure boolean
+            approval: !!user.approval,                     // Ensure boolean
             createdAt: user.created_at,
             updatedAt: user.updated_at,
-            isPrivate: !!user.is_private,                  // Ensure boolean
+            // 🛑 isPrivate REMOVED from output object
         };
         
         res.json(transformedUser);
         
     } catch (error) {
         console.error('Get profile error:', error);
-        // Returning the error message helps debug live issues
         res.status(500).json({ error: 'Internal server error: ' + error.message });
     }
 });
@@ -95,6 +94,7 @@ router.post('/profile', auth, async (req, res) => {
         const favouritePlacesToGoJson = JSON.stringify(favouritePlacesToGo || []);
         
         await pool.execute(
+            // 🛑 is_private REMOVED from UPDATE query
             `UPDATE users SET 
                 first_name = ?, last_name = ?, gender = ?, dob = ?, 
                 current_location = ?, favourite_travel_destination = ?, 
@@ -134,23 +134,17 @@ router.put('/profile', auth, async (req, res) => {
         const {
             firstName, lastName, gender, dob, currentLocation, favouriteTravelDestination,
             lastHolidayPlaces, favouritePlacesToGo, profilePicUrl, intent, onboardingComplete,
-            isPrivate
+            isPrivate // This is read, but won't be used in the SQL/updateData
         } = req.body;
         
         let finalIntent = { ...currentIntent, ...intent };
         const intentJson = JSON.stringify(finalIntent); 
         
-        // 💡 CRITICAL: Determine the final approval status. 
-        // We ensure that if onboardingComplete is set to true (meaning user finished the app),
-        // we explicitly set APPROVAL TO FALSE to put them on the waitlist.
-        let finalApprovalStatus = currentUser.approval; // Preserve current status by default
+        // CRITICAL: Determine the final approval status. 
+        let finalApprovalStatus = currentUser.approval;
         if (onboardingComplete === true) {
             finalApprovalStatus = false; 
-        } else if (onboardingComplete === false) {
-            // Allow the frontend to explicitly set onboardingComplete to false,
-            // but don't automatically change the approval state.
         }
-
 
         const updateData = [
             firstName !== undefined ? firstName : currentUser.first_name,
@@ -164,21 +158,21 @@ router.put('/profile', auth, async (req, res) => {
             profilePicUrl !== undefined ? profilePicUrl : currentUser.profile_pic_url,
             intentJson,
             onboardingComplete !== undefined ? onboardingComplete : currentUser.onboarding_complete,
-            isPrivate !== undefined ? isPrivate : currentUser.is_private,
-            finalApprovalStatus, // 👈 ADDED to the updateData array
+            // 🛑 isPrivate removed from here
+            finalApprovalStatus, // The final item before userId
             req.user.userId
         ];
         
         await pool.execute(
+            // 🛑 is_private REMOVED from UPDATE query
             `UPDATE users SET 
                 first_name = ?, last_name = ?, gender = ?, dob = ?, 
                 current_location = ?, favourite_travel_destination = ?, 
                 last_holiday_places = ?, favourite_places_to_go = ?, 
                 profile_pic_url = ?, intent = ?, onboarding_complete = ?,
-                is_private = ?, 
                 approval = ?  
             WHERE id = ?`,
-            updateData // The array now matches the number of placeholders
+            updateData 
         );
         
         res.json({ message: 'Profile updated successfully' });
@@ -190,7 +184,6 @@ router.put('/profile', auth, async (req, res) => {
 });
 
 // ❌ SECURITY FLAW & DUPLICATE ROUTE - THIS MUST BE REMOVED/MOVED
-// The admin approval logic should live in backend/routes/admin.js
 router.put('/approve/:userId', auth, async (req, res) => {
     // This entire route should be removed as it's a security flaw and duplicated logic.
     // The correct endpoint is in admin.js: PUT /admin/users/:userId/approval
