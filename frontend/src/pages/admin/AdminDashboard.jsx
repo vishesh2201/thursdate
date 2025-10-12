@@ -20,7 +20,7 @@ export default function AdminDashboard() {
         if (err.message.includes('Admin access required')) {
           // Redirect to login if not admin
           authAPI.logout();
-          navigate('/login');
+          navigate('/admin-login');
         }
       } finally {
         setLoading(false);
@@ -32,7 +32,7 @@ export default function AdminDashboard() {
 
   const handleLogout = () => {
     authAPI.logout();
-    navigate('/login');
+    navigate('/admin-login');
   };
 
   if (loading) {

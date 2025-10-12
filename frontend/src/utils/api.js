@@ -68,12 +68,38 @@ const authRequest = async (url, options = {}) => {
         },
     });
 
+    // 🛑 FIX: Read the response body as text first to prevent JSON.parse errors on empty bodies.
+    const responseText = await response.text();
+    const isJson = response.headers.get('content-type')?.includes('application/json');
+
     if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Request failed');
+        // If the request failed (4xx or 5xx)
+        if (responseText && isJson) {
+            // Attempt to parse the error message if it's JSON
+            try {
+                const error = JSON.parse(responseText);
+                throw new Error(error.error || 'Request failed');
+            } catch (e) {
+                // If parsing the error fails, throw a generic message
+                throw new Error('Request failed: ' + responseText);
+            }
+        }
+        throw new Error('Request failed with status: ' + response.status);
+    }
+    
+    // 🛑 FIX: Return an empty object if there is no response body (e.g., 204 No Content).
+    if (!responseText) {
+        return {};
     }
 
-    return response.json();
+    // Safely parse the JSON response
+    try {
+        return JSON.parse(responseText);
+    } catch (e) {
+        console.error("JSON parsing error:", e, "Response Text:", responseText);
+        // Throw an error to ensure the calling component knows the fetch failed
+        throw new Error("Failed to process server response (JSON error).");
+    }
 };
 
 // Authentication API
