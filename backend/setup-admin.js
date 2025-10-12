@@ -1,3 +1,4 @@
+// backend/setup-admin.js
 require('dotenv').config();
 const pool = require('./config/db');
 
@@ -13,7 +14,7 @@ async function setupAdmin() {
     const [users] = await pool.execute('SELECT id, email FROM users');
     console.log('\nAvailable users:');
     users.forEach(user => {
-      console.log(`  - ID: ${user.id}, Email: ${user.email}`);
+      console.log(`  - ID: ${user.id}, Email: ${user.email}`);
     });
     
     // Check if any existing users are admins
@@ -21,10 +22,10 @@ async function setupAdmin() {
     console.log('\nCurrent admin users:');
     if (adminUsers.length > 0) {
       adminUsers.forEach(user => {
-        console.log(`  ✅ ${user.email} (ID: ${user.id})`);
+        console.log(`  ✅ ${user.email} (ID: ${user.id})`);
       });
     } else {
-      console.log('  ❌ No admin users found');
+      console.log('  ❌ No admin users found');
     }
     
     // Suggest setup
@@ -48,4 +49,4 @@ async function setupAdmin() {
   }
 }
 
-setupAdmin(); 
+setupAdmin();
