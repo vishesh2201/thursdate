@@ -116,7 +116,7 @@ export default function UserIntent() {
     try {
       // First, get the current user profile to preserve existing data
       const currentProfile = await userAPI.getProfile();
-      
+
       // Update with both existing user info and new intent data
       await userAPI.updateProfile({
         // Preserve existing user info
@@ -129,7 +129,7 @@ export default function UserIntent() {
         lastHolidayPlaces: currentProfile.lastHolidayPlaces,
         favouritePlacesToGo: currentProfile.favouritePlacesToGo,
         profilePicUrl: currentProfile.profilePicUrl,
-        
+
         // Add new intent data
         intent: {
           purpose,
@@ -426,7 +426,7 @@ export default function UserIntent() {
         return (
           <>
             <h1 className="text-2xl font-semibold mb-3 mt-0">What's your purpose for joining?</h1>
-            <p className="text-gray-500 mb-4 text-sm font-normal leading-snug">I match you with members who share your relationship goals—your choice shapes your journey in the Club!</p>
+            <p className="text-gray-500 mb-4 text-sm font-normal leading-snug">I match you with members who share your relationship goals; your choice shapes your journey in the Club!</p>
           </>
         );
       case 2:
