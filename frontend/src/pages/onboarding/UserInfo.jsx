@@ -126,7 +126,7 @@ export default function UserInfo() {
           favouritePlacesToGo,
           profilePicUrl,
         });
-        navigate('/referral');
+        navigate('/social-presence');
       } catch (err) {
         alert("Failed to save user info: " + err.message);
       }
@@ -286,7 +286,7 @@ export default function UserInfo() {
 
   return (
     // Set the overall background to the provided image and make content a glass card
-    <div 
+    <div
       className="h-screen flex flex-col font-sans"
       style={{
         backgroundImage: `url(${backgroundImage})`,
@@ -296,7 +296,7 @@ export default function UserInfo() {
     >
       {/* Overlay for a slight darkening effect on the background image */}
       <div className="absolute inset-0 bg-black/30 z-0"></div>
-      
+
       {/* Main Content Container with Glassmorphism Effect */}
       <div className={`relative z-10 p-6 pt-10 flex flex-col flex-grow ${GLASS_BACKGROUND}`}>
         {/* Header */}
@@ -305,7 +305,7 @@ export default function UserInfo() {
             onClick={handleBack}
             className="w-8 h-8 flex items-center justify-center p-1 rounded-full bg-white/20 backdrop-blur-sm text-white"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
           </button>
           <div className="text-white/80 text-[24px] font-semibold mx-auto">
             Sundate.
@@ -323,7 +323,7 @@ export default function UserInfo() {
 
         {/* Dynamic Step Content */}
         <div className="flex flex-col flex-grow">
-          
+
           {/* Step 1: Name Details */}
           {step === 1 && (
             <div className="flex flex-col flex-grow">
@@ -351,9 +351,8 @@ export default function UserInfo() {
               <button
                 disabled={getNextButtonDisabled()}
                 onClick={handleNext}
-                className={`w-full py-4 rounded-xl font-medium text-lg transition ${
-                  getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
-                }`}
+                className={`w-full py-4 rounded-xl font-medium text-lg transition ${getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
+                  }`}
               >
                 {getNextButtonText()}
               </button>
@@ -374,9 +373,8 @@ export default function UserInfo() {
               ].map((option) => (
                 <label
                   key={option}
-                  className={`flex items-center justify-between rounded-xl px-4 py-4 mb-3 cursor-pointer transition ${
-                    gender === option ? CARD_GLASS_ACTIVE : CARD_GLASS_INACTIVE
-                  }`}
+                  className={`flex items-center justify-between rounded-xl px-4 py-4 mb-3 cursor-pointer transition ${gender === option ? CARD_GLASS_ACTIVE : CARD_GLASS_INACTIVE
+                    }`}
                 >
                   <span className="font-medium">{option}</span>
                   <input
@@ -442,9 +440,8 @@ export default function UserInfo() {
                 <button
                   disabled={getNextButtonDisabled()}
                   onClick={handleNext}
-                  className={`w-full py-4 rounded-xl font-medium text-lg transition ${
-                    getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
-                  }`}
+                  className={`w-full py-4 rounded-xl font-medium text-lg transition ${getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
+                    }`}
                 >
                   {getNextButtonText()}
                 </button>
@@ -463,7 +460,7 @@ export default function UserInfo() {
                 }}
               >
                 <span className="font-medium">{dob ? new Date(dob).toLocaleDateString('en-GB') : "DD/MM/YYYY"}</span>
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-calendar text-white/70"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-calendar text-white/70"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" /></svg>
               </div>
               <p className={`text-xs mb-auto text-white/60 ${isStepThreeValid ? 'text-white/60' : 'text-red-300'}`}>
                 {isStepThreeValid ? 'You meet the minimum age requirement.' : 'Must be at least 30 years old.'}
@@ -471,9 +468,8 @@ export default function UserInfo() {
               <button
                 disabled={getNextButtonDisabled()}
                 onClick={handleNext}
-                className={`w-full py-4 rounded-xl font-medium text-lg transition ${
-                  getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
-                }`}
+                className={`w-full py-4 rounded-xl font-medium text-lg transition ${getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
+                  }`}
               >
                 {getNextButtonText()}
               </button>
@@ -570,9 +566,8 @@ export default function UserInfo() {
               <button
                 disabled={getNextButtonDisabled()}
                 onClick={handleNext}
-                className={`w-full py-4 rounded-xl font-medium text-lg transition ${
-                  getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
-                }`}
+                className={`w-full py-4 rounded-xl font-medium text-lg transition ${getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
+                  }`}
               >
                 {getNextButtonText()}
               </button>
@@ -604,9 +599,8 @@ export default function UserInfo() {
               <button
                 disabled={getNextButtonDisabled()}
                 onClick={handleNext}
-                className={`w-full py-4 rounded-xl font-medium text-lg transition ${
-                  getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
-                }`}
+                className={`w-full py-4 rounded-xl font-medium text-lg transition ${getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
+                  }`}
               >
                 {getNextButtonText()}
               </button>
@@ -680,9 +674,8 @@ export default function UserInfo() {
               <button
                 disabled={getNextButtonDisabled()}
                 onClick={handleNext}
-                className={`w-full py-4 rounded-xl font-medium text-lg transition mt-6 ${
-                  getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
-                }`}
+                className={`w-full py-4 rounded-xl font-medium text-lg transition mt-6 ${getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
+                  }`}
               >
                 {getNextButtonText()}
               </button>
@@ -744,7 +737,7 @@ export default function UserInfo() {
                     {favouritePlaceSuggestions.map((suggestion, index) => (
                       <li
                         key={index}
-                        onClick={() => handleFavouritePlaceSuggestionClick (suggestion)}
+                        onClick={() => handleFavouritePlaceSuggestionClick(suggestion)}
                         className="px-4 py-2 text-sm text-white hover:bg-white/20 cursor-pointer transition"
                       >
                         {suggestion}
@@ -756,9 +749,8 @@ export default function UserInfo() {
               <button
                 disabled={getNextButtonDisabled()}
                 onClick={handleNext}
-                className={`w-full py-4 rounded-xl font-medium text-lg transition mt-6 ${
-                  getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
-                }`}
+                className={`w-full py-4 rounded-xl font-medium text-lg transition mt-6 ${getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
+                  }`}
               >
                 {getNextButtonText()}
               </button>
@@ -769,8 +761,8 @@ export default function UserInfo() {
           {step === 8 && (
             <div className="flex flex-col flex-grow items-center">
               <h1 className="text-2xl font-semibold mb-2 text-white drop-shadow-md">Face Verification</h1>
-              <p className="text-sm text-white/70 mb-6 text-center">Upload a clear face photo.<br/>This won’t appear on your profile—it’s just to keep our community safe.</p>
-              
+              <p className="text-sm text-white/70 mb-6 text-center">Upload a clear face photo.<br />This won’t appear on your profile—it’s just to keep our community safe.</p>
+
               <div className="flex flex-col items-center mb-auto">
                 <div
                   className="w-36 h-36 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center overflow-hidden mb-4 border-4 border-white/50 relative cursor-pointer shadow-xl transition"
@@ -787,7 +779,7 @@ export default function UserInfo() {
                     </div>
                   )}
                 </div>
-                
+
                 <div className="text-xs text-white/60 text-center">
                   <div className="mb-2 font-semibold text-white/80">Pro Tip:</div>
                   <ul className="list-disc list-inside text-xs text-white/70 text-left w-max mx-auto">
@@ -801,9 +793,8 @@ export default function UserInfo() {
               <button
                 disabled={getNextButtonDisabled()}
                 onClick={handleNext}
-                className={`w-full py-4 rounded-xl font-medium text-lg transition ${
-                  getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
-                }`}
+                className={`w-full py-4 rounded-xl font-medium text-lg transition ${getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
+                  }`}
               >
                 {getNextButtonText()}
               </button>

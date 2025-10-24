@@ -3,6 +3,7 @@ import Splash from "./pages/onboarding/Splash";
 import Gateway from "./pages/onboarding/Gateway";
 import UserInfo from "./pages/onboarding/UserInfo";
 import Referral from "./pages/onboarding/Referral";
+import SocialPresence from "./pages/onboarding/SocialPresence";
 import ApplicationStatus from "./pages/onboarding/ApplicationStatus";
 import Privacy from "./pages/onboarding/Privacy";
 import Different from "./pages/onboarding/Different";
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="/" element={<Splash />} />
         <Route path="/gateway" element={<Gateway />} />
         <Route path="/user-info" element={<UserInfo />} />
+        <Route path="/social-presence" element={<SocialPresence />} />
         <Route path="/referral" element={<Referral />} />
         <Route path="/application-status" element={<ApplicationStatus />} />
         <Route path="/privacy" element={<Privacy />} />
@@ -54,13 +56,13 @@ export default function App() {
         <Route path="/edit-profile-picture" element={<EditProfilePicture />} />
         <Route path="/edit-lifestyle-images" element={<EditLifestyleImages />} />
         <Route path="/user-intent" element={<UserIntent />} />
-        
+
         {/* Admin Routes */}
         <Route path="/admin-login" element={<AdminLogin />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/waitlist" element={<AdminWaitlist />} />
         <Route path="/admin/users" element={<AdminUsers />} />
-        
+
         {/* Settings Routes */}
         <Route path="/settings/age-preference" element={<AgePreference />} />
         <Route path="/settings/gender-preference" element={<GenderPreference />} />
