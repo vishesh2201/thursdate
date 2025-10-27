@@ -200,8 +200,9 @@ export default function SocialPresence() {
                             {!showInstaConfirm && (
                                 <button
                                     className="w-full py-4 rounded-full font-medium text-lg border border-white/40 text-white bg-black/30 hover:bg-black/50 transition"
+                                    onClick={() => navigate('/waitlist-status')}
                                 >
-                                    I don’t have Instagram
+                                    I don't have Instagram
                                 </button>
                             )}
                         </div>
@@ -322,7 +323,7 @@ export default function SocialPresence() {
                                             </div>
                                             <button
                                                 className={`w-full py-4 rounded-xl font-medium text-lg transition ${BUTTON_GLASS_ACTIVE}`}
-                                                onClick={() => {/* next onboarding step here */ }}
+                                                onClick={() => navigate('/waitlist-status')}
                                             >
                                                 Continue
                                             </button>
