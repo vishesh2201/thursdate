@@ -32,6 +32,10 @@ import DevicePermissions from "./pages/settings/DevicePermissionsPage";
 
 import "@ncdai/react-wheel-picker/style.css";
 import Verification from "./pages/onboarding/Verification";
+import FaceVerification from "./pages/onboarding/FaceVerification";
+import NotificationPermission from "./pages/onboarding/NotificationPermission";
+import LocationPermission from "./pages/onboarding/LocationPermission";
+import SubmissionProgress from "./pages/onboarding/SubmissionProgress";
 
 export default function App() {
   return (
@@ -47,6 +51,10 @@ export default function App() {
         <Route path="/different" element={<Different />} />
         <Route path="/verification" element={<Verification />} />
         <Route path="/permissions" element={<Permissions />} />
+        <Route path="/face-verification" element={<FaceVerification />} />
+        <Route path="/notification-permission" element={<NotificationPermission />} />
+        <Route path="/location-permission" element={<LocationPermission />} />
+        <Route path="/submitting-profile" element={<SubmissionProgress />} />
         <Route path="/waitlist-status" element={<WaitlistStatus />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
