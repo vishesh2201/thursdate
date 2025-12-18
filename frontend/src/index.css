@@ -48,6 +48,16 @@ body {
   /* and adjust based on scroll position */
 }
 
+/* Hide scrollbars but keep scroll functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
+
 .picker-item.selected {
   font-weight: bold;
   color: #222222;

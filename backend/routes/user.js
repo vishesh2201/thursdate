@@ -38,7 +38,7 @@ router.get('/profile', auth, async (req, res) => {
 
         const [users] = await pool.execute(
             // 🛑 FIX: is_private REMOVED from the SELECT query
-            'SELECT id, email, first_name, last_name, gender, dob, current_location, favourite_travel_destination, last_holiday_places, favourite_places_to_go, profile_pic_url, approval, intent, onboarding_complete FROM users WHERE id = ?',
+            'SELECT id, email, first_name, last_name, gender, dob, current_location, favourite_travel_destination, last_holiday_places, favourite_places_to_go, profile_pic_url, approval, intent, onboarding_complete, interests, pets, drinking, smoking, height, religious_level, kids_preference, food_preference, relationship_status, from_location, instagram, linkedin, face_photos FROM users WHERE id = ?',
             [req.user.userId]
         );
         
@@ -67,6 +67,20 @@ router.get('/profile', auth, async (req, res) => {
             createdAt: user.created_at,
             updatedAt: user.updated_at,
             // 🛑 isPrivate REMOVED from output object
+            // ✅ NEW: Profile columns from hybrid storage approach
+            interests: safeJsonParse(user.interests, []),
+            pets: user.pets || null,
+            drinking: user.drinking || null,
+            smoking: user.smoking || null,
+            height: user.height || null,
+            religiousLevel: user.religious_level || null,
+            kidsPreference: user.kids_preference || null,
+            foodPreference: user.food_preference || null,
+            relationshipStatus: user.relationship_status || null,
+            fromLocation: user.from_location || null,
+            instagram: user.instagram || null,
+            linkedin: user.linkedin || null,
+            facePhotos: safeJsonParse(user.face_photos, []),
         };
         
         res.json(transformedUser);
@@ -131,20 +145,33 @@ router.put('/profile', auth, async (req, res) => {
         const currentUser = currentUsers[0];
         const currentIntent = safeJsonParse(currentUser.intent, {});
         
+        // 🔍 DEBUG: Log incoming data
+        console.log('PUT /profile - Received data:', {
+            hasInterests: !!req.body.interests,
+            hasPets: !!req.body.pets,
+            hasDrinking: !!req.body.drinking,
+            hasSmoking: !!req.body.smoking,
+            hasHeight: !!req.body.height,
+            pets: req.body.pets,
+            drinking: req.body.drinking,
+            smoking: req.body.smoking,
+            height: req.body.height,
+        });
+        
         const {
             firstName, lastName, gender, dob, currentLocation, favouriteTravelDestination,
             lastHolidayPlaces, favouritePlacesToGo, profilePicUrl, intent, onboardingComplete,
-            isPrivate // This is read, but won't be used in the SQL/updateData
+            isPrivate, // This is read, but won't be used in the SQL/updateData
+            // ✅ NEW: Extract profile fields for hybrid storage
+            interests, pets, drinking, smoking, height, religiousLevel, kidsPreference, 
+            foodPreference, relationshipStatus, fromLocation, instagram, linkedin, facePhotos
         } = req.body;
         
         let finalIntent = { ...currentIntent, ...intent };
         const intentJson = JSON.stringify(finalIntent); 
         
-        // CRITICAL: Determine the final approval status. 
+        // Keep the current approval status - don't change it when onboarding completes
         let finalApprovalStatus = currentUser.approval;
-        if (onboardingComplete === true) {
-            finalApprovalStatus = false; 
-        }
 
         const updateData = [
             firstName !== undefined ? firstName : currentUser.first_name,
@@ -159,18 +186,37 @@ router.put('/profile', auth, async (req, res) => {
             intentJson,
             onboardingComplete !== undefined ? onboardingComplete : currentUser.onboarding_complete,
             // 🛑 isPrivate removed from here
-            finalApprovalStatus, // The final item before userId
+            finalApprovalStatus,
+            // ✅ NEW: Profile columns for hybrid storage
+            JSON.stringify(interests !== undefined ? interests : safeJsonParse(currentUser.interests, [])),
+            pets !== undefined ? pets : currentUser.pets,
+            drinking !== undefined ? drinking : currentUser.drinking,
+            smoking !== undefined ? smoking : currentUser.smoking,
+            height !== undefined ? height : currentUser.height,
+            religiousLevel !== undefined ? religiousLevel : currentUser.religious_level,
+            kidsPreference !== undefined ? kidsPreference : currentUser.kids_preference,
+            foodPreference !== undefined ? foodPreference : currentUser.food_preference,
+            relationshipStatus !== undefined ? relationshipStatus : currentUser.relationship_status,
+            fromLocation !== undefined ? fromLocation : currentUser.from_location,
+            instagram !== undefined ? instagram : currentUser.instagram,
+            linkedin !== undefined ? linkedin : currentUser.linkedin,
+            JSON.stringify(facePhotos !== undefined ? facePhotos : safeJsonParse(currentUser.face_photos, [])),
             req.user.userId
         ];
         
         await pool.execute(
             // 🛑 is_private REMOVED from UPDATE query
+            // ✅ NEW: Added profile columns for hybrid storage
             `UPDATE users SET 
                 first_name = ?, last_name = ?, gender = ?, dob = ?, 
                 current_location = ?, favourite_travel_destination = ?, 
                 last_holiday_places = ?, favourite_places_to_go = ?, 
                 profile_pic_url = ?, intent = ?, onboarding_complete = ?,
-                approval = ?  
+                approval = ?,
+                interests = ?, pets = ?, drinking = ?, smoking = ?, height = ?,
+                religious_level = ?, kids_preference = ?, food_preference = ?,
+                relationship_status = ?, from_location = ?, instagram = ?, linkedin = ?,
+                face_photos = ?
             WHERE id = ?`,
             updateData 
         );
@@ -188,6 +234,77 @@ router.put('/approve/:userId', auth, async (req, res) => {
     // This entire route should be removed as it's a security flaw and duplicated logic.
     // The correct endpoint is in admin.js: PUT /admin/users/:userId/approval
     res.status(403).json({ error: 'Route deprecated. Use /admin/users/:userId/approval' });
+});
+
+// Get potential matches for the current user
+router.get('/matches/potential', auth, async (req, res) => {
+    try {
+        if (!(await validateConnection())) {
+            return res.status(500).json({ error: 'Database connection failed' });
+        }
+
+        // Get potential matches - all approved users except the current user
+        const [users] = await pool.execute(
+            `SELECT id, email, first_name, last_name, gender, dob, current_location, 
+                    favourite_travel_destination, profile_pic_url, intent, 
+                    interests, pets, drinking, smoking, height, religious_level, 
+                    kids_preference, food_preference, relationship_status, from_location, 
+                    instagram, linkedin, face_photos
+             FROM users 
+             WHERE approval = true AND id != ? AND onboarding_complete = true
+             ORDER BY RAND()
+             LIMIT 20`,
+            [req.user.userId]
+        );
+
+        // Parse JSON fields for each user
+        const candidates = users.map(user => {
+            // Calculate age from dob
+            let age = null;
+            if (user.dob) {
+                const birthDate = new Date(user.dob);
+                const today = new Date();
+                age = today.getFullYear() - birthDate.getFullYear();
+                const m = today.getMonth() - birthDate.getMonth();
+                if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                    age--;
+                }
+            }
+
+            return {
+                id: user.id,
+                email: user.email,
+                firstName: user.first_name,
+                lastName: user.last_name,
+                age: age,
+                gender: user.gender,
+                dob: user.dob,
+                currentLocation: user.current_location,
+                fromLocation: user.from_location,
+                favouriteTravelDestination: user.favourite_travel_destination,
+                profilePicUrl: user.profile_pic_url,
+                height: user.height,
+                relationshipStatus: user.relationship_status,
+                pets: user.pets,
+                drinking: user.drinking,
+                smoking: user.smoking,
+                foodPreference: user.food_preference,
+                religiousLevel: user.religious_level,
+                kidsPreference: user.kids_preference,
+                instagram: user.instagram,
+                linkedin: user.linkedin,
+                interests: safeJsonParse(user.interests, []),
+                facePhotos: safeJsonParse(user.face_photos, []),
+                intent: safeJsonParse(user.intent, {})
+            };
+        });
+
+        res.json({ candidates });
+
+    } catch (error) {
+        console.error('Get matches error:', error);
+        res.status(500).json({ error: 'Internal server error: ' + error.message });
+    }
 });
 
 module.exports = router;

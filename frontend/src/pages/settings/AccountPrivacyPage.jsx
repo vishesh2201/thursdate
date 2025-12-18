@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { userAPI } from '../../utils/api';
 
-// A reusable Toggle Switch component to match the Figma design
+// A reusable Toggle Switch component to match the design
 const ToggleSwitch = ({ checked, onChange, disabled }) => (
   <button
     type="button"
@@ -10,10 +10,10 @@ const ToggleSwitch = ({ checked, onChange, disabled }) => (
     aria-checked={checked}
     onClick={onChange}
     disabled={disabled}
-    className={`relative inline-flex items-center h-7 w-12 rounded-full transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 ${checked ? 'bg-black' : 'bg-gray-300'}`}
+    className={`relative inline-flex items-center h-8 w-14 rounded-full transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 flex-shrink-0 ${checked ? 'bg-white' : 'bg-gray-600'}`}
   >
     <span
-      className={`inline-block w-5 h-5 transform bg-white rounded-full transition-transform duration-200 ease-in-out ${checked ? 'translate-x-6' : 'translate-x-1'}`}
+      className={`inline-block w-6 h-6 transform rounded-full transition-transform duration-200 ease-in-out ${checked ? 'translate-x-7 bg-black' : 'translate-x-1 bg-white'}`}
     />
   </button>
 );
@@ -71,55 +71,88 @@ export default function AccountPrivacyPage() {
   };
 
   if (initialLoading) {
-    return <div className="h-screen bg-white flex justify-center items-center">Loading...</div>;
+    return (
+      <div
+        className="h-screen flex justify-center items-center relative"
+        style={{
+          backgroundImage: "url('/bgs/faceverifybg.png')",
+          backgroundSize: 'cover',
+          backgroundPosition: 'center'
+        }}
+      >
+        <div className="absolute inset-0 bg-black/40"></div>
+        <p className="relative z-10 text-white">Loading...</p>
+      </div>
+    );
   }
 
   const hasChanged = isPrivate !== originalIsPrivate;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
+    <div
+      className="min-h-screen flex flex-col font-sans relative"
+      style={{
+        backgroundImage: "url('/bgs/faceverifybg.png')",
+        backgroundSize: 'cover',
+        backgroundPosition: 'center'
+      }}
+    >
+      <div className="absolute inset-0 bg-black/40"></div>
       {/* Top Bar */}
-      <div className="bg-white p-4 border-b border-gray-200">
-        <div className="flex items-center">
-          <button onClick={() => navigate(-1)} className="w-8 h-8 flex items-center justify-center">
-            <img src="/backarrow.svg" alt="Back" width={24} height={24} />
+      <div className="relative z-10 p-6 pt-12">
+        <div className="flex items-center mb-6">
+          <button onClick={() => navigate(-1)} className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M15 18l-6-6 6-6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </button>
-          <h1 className="flex-1 text-center text-lg font-semibold text-gray-800">Account privacy</h1>
-          <div style={{ width: 32 }}></div> {/* Spacer */}
+          <h1 className="flex-1 text-center text-xl font-semibold text-white -ml-10">Account Privacy</h1>
         </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 p-6">
-        <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
-          <div>
-            <label className="font-semibold text-gray-800">
-              Private account
-            </label>
+      <div className="relative z-10 flex-1 px-6 pb-6">
+        <h2 className="text-sm font-semibold text-white/70 mb-3">Preferences</h2>
+        <div className="bg-[#2C2C2E] rounded-2xl p-4">
+          <div className="flex justify-between items-start">
+            <div className="flex-1">
+              <label className="font-medium text-white text-base block mb-1">
+                Private account
+              </label>
+              <p className="text-sm text-white/60 leading-relaxed pr-4">
+                When your account is private, only profiles you've matched with can view your profile.
+              </p>
+            </div>
+            <ToggleSwitch
+              checked={isPrivate}
+              onChange={handleToggle}
+            />
           </div>
-          <ToggleSwitch 
-            checked={isPrivate}
-            onChange={handleToggle}
-          />
         </div>
-        <p className="text-sm text-gray-500 mt-3 px-2">
-          When your account is private, only profiles you've matched with can view your profile.
-        </p>
       </div>
 
       {/* Error display */}
-      {error && <p className="text-red-500 text-center mb-4">{error}</p>}
-      
-      {/* Sticky Save Button Footer */}
-      <div className="sticky bottom-0 bg-white p-4 border-t border-gray-200">
-        <button
-          onClick={handleSave}
-          disabled={!hasChanged || isSaving}
-          className="w-full py-4 rounded-2xl text-white font-semibold text-base bg-black disabled:bg-gray-300"
-        >
-          {isSaving ? 'Saving...' : 'Save'}
-        </button>
-      </div>
+      {error && (
+        <div className="relative z-10 px-6 pb-4">
+          <p className="text-red-400 text-center bg-red-900/20 backdrop-blur-sm rounded-xl p-3 border border-red-500/30">{error}</p>
+        </div>
+      )}
+
+      {/* Save Button - only show if changed */}
+      {hasChanged && (
+        <div className="relative z-10 p-6 pt-0 pb-8">
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="w-full py-4 rounded-full text-black font-semibold text-base bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSaving ? 'Saving...' : 'Save'}
+          </button>
+          <div className="flex justify-center mt-4">
+            <div className="w-32 h-1 bg-white/30 rounded-full"></div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

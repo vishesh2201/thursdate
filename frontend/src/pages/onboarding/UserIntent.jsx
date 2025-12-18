@@ -54,19 +54,24 @@ export default function UserIntent() {
       try {
         const userData = await userAPI.getProfile();
         if (!mounted) return;
-        if (userData.intent) {
-          setPurpose(userData.intent.purpose || '');
-          setRelationshipVibe(userData.intent.relationshipVibe || '');
-          setInterestedGender(userData.intent.interestedGender || '');
-          setAgeRange(userData.intent.preferredAgeRange || [40, 60]);
-          setBio(userData.intent.bio || '');
-          setInterests(userData.intent.interests || []);
-          setTvShows(userData.intent.tvShows || []);
-          setMovies(userData.intent.movies || []);
-          setWatchList(userData.intent.watchList || []);
-          setArtistsBands(userData.intent.artistsBands || []);
-          setProfileImageUrl(userData.profileImageUrl || null);
-          setLifestyleImageUrls(userData.intent.lifestyleImageUrls || [null, null, null, null, null]);
+        if (userData) {
+          // Load from root level (new hybrid storage)
+          setInterests(userData.interests || []);
+          setProfileImageUrl(userData.profilePicUrl || null);
+
+          // Load from intent object
+          if (userData.intent) {
+            setPurpose(userData.intent.purpose || '');
+            setRelationshipVibe(userData.intent.relationshipVibe || '');
+            setInterestedGender(userData.intent.interestedGender || '');
+            setAgeRange(userData.intent.preferredAgeRange || [40, 60]);
+            setBio(userData.intent.bio || '');
+            setTvShows(userData.intent.tvShows || []);
+            setMovies(userData.intent.movies || []);
+            setWatchList(userData.intent.watchList || []);
+            setArtistsBands(userData.intent.artistsBands || []);
+            setLifestyleImageUrls(userData.intent.lifestyleImageUrls || [null, null, null, null, null]);
+          }
         }
       } catch (err) {
         console.error('Failed to load profile', err);
@@ -222,18 +227,18 @@ export default function UserIntent() {
     // Set a preview URL directly from the file object
     setProfileImageUrl(URL.createObjectURL(file));
 
-    // Removed backend upload logic for preview-only functionality
-    // setProfileImgError('');
-    // setProfileImgUploading(true);
-    // try {
-    //   const res = await uploadAPI.uploadProfileImage(file);
-    //   setProfileImageUrl(res.url);
-    // } catch (err) {
-    //   console.error('Upload error', err);
-    //   setProfileImgError('Failed to upload image. Try again.');
-    // } finally {
-    //   setProfileImgUploading(false);
-    // }
+    // Upload to backend/Cloudinary
+    setProfileImgError('');
+    setProfileImgUploading(true);
+    try {
+      const res = await uploadAPI.uploadProfilePicture(file);
+      setProfileImageUrl(res.url);
+    } catch (err) {
+      console.error('Upload error', err);
+      setProfileImgError(err.message || 'Failed to upload image. Try again.');
+    } finally {
+      setProfileImgUploading(false);
+    }
   };
 
   // Lifestyle image upload
@@ -246,22 +251,22 @@ export default function UserIntent() {
       return next;
     });
 
-    // Removed backend upload logic for preview-only functionality
-    // setImgError('');
-    // setImgUploading(true);
-    // try {
-    //   const res = await uploadAPI.uploadLifestyleImage(file);
-    //   setLifestyleImageUrls(prev => {
-    //     const next = [...prev];
-    //     next[idx] = res.url;
-    //     return next;
-    //   });
-    // } catch (err) {
-    //   console.error('Upload error', err);
-    //   setImgError('Failed to upload image. Try again.');
-    // } finally {
-    //   setImgUploading(false);
-    // }
+    // Upload to backend/Cloudinary
+    setImgError('');
+    setImgUploading(true);
+    try {
+      const res = await uploadAPI.uploadLifestyleImage(file);
+      setLifestyleImageUrls(prev => {
+        const next = [...prev];
+        next[idx] = res.url;
+        return next;
+      });
+    } catch (err) {
+      console.error('Upload error', err);
+      setImgError(err.message || 'Upload failed');
+    } finally {
+      setImgUploading(false);
+    }
   };
 
   // Validation
@@ -291,13 +296,17 @@ export default function UserIntent() {
       const currentProfile = await userAPI.getProfile();
       await userAPI.updateProfile({
         ...currentProfile,
+        // ✅ NEW: Send interests at root level for hybrid storage
+        interests,
+        // ✅ FIX: Map relationshipVibe to relationshipStatus for root-level DB column
+        relationshipStatus: relationshipVibe,
         intent: {
+          ...currentProfile.intent,
           purpose,
           relationshipVibe,
           interestedGender,
           preferredAgeRange: ageRange,
           bio,
-          interests,
           tvShows,
           movies,
           watchList,
@@ -305,9 +314,9 @@ export default function UserIntent() {
           lifestyleImageUrls,
         },
         profileImageUrl,
-        onboardingComplete: true,
+        onboardingComplete: false, // Still not complete - need to do ProfileQuestions
       });
-      navigate('/home');
+      navigate('/profile-questions');
     } catch (err) {
       console.error('Save failed', err);
       alert('Failed to save. ' + (err.message || ''));

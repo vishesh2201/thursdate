@@ -14,20 +14,31 @@ export default function DirectRequestsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
+    <div
+      className="min-h-screen flex flex-col font-sans relative"
+      style={{
+        backgroundImage: "url('/bgs/faceverifybg.png')",
+        backgroundSize: 'cover',
+        backgroundPosition: 'center'
+      }}
+    >
+      <div className="absolute inset-0 bg-black/40"></div>
       {/* Top Bar */}
-      <div className="bg-white p-4 border-b border-gray-200">
-        <div className="flex items-center">
-          <button onClick={() => navigate(-1)} className="w-8 h-8 flex items-center justify-center">
-            <img src="/backarrow.svg" alt="Back" width={24} height={24} />
+      <div className="relative z-10 p-6 pt-12">
+        <div className="flex items-center justify-between mb-6">
+          <button onClick={() => navigate(-1)} className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M15 18l-6-6 6-6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </button>
-          <h1 className="flex-1 text-center text-lg font-semibold text-gray-800">Direct Messages</h1>
+          <h1 className="flex-1 text-center text-xl font-semibold text-white">Direct Messages</h1>
+          <div style={{ width: 40 }}></div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex flex-col items-center p-4 text-center">
-        <p className="text-gray-600 mb-4 text-left">
+      <div className="relative z-10 flex-1 flex flex-col items-center px-6 pb-6 text-center">
+        <p className="text-white/80 mb-6 text-left">
           Direct Messages are a way to let us know that you're really interested in connecting with another member.
         </p>
 
@@ -36,16 +47,16 @@ export default function DirectRequestsPage() {
             <button
               key={pack.id}
               onClick={() => handlePurchase(pack)}
-              className="w-full bg-white border border-gray-200 hover:bg-gray-100 text-gray-800 text-sm py-4 px-6 rounded-xl transition-colors"
+              className="w-full bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 text-white text-sm py-4 px-6 rounded-2xl transition-colors font-medium"
             >
               {pack.amount} Direct Request{pack.amount > 1 ? 's' : ''} for ₹ {pack.price}
             </button>
           ))}
         </div>
 
-        <button 
+        <button
           onClick={() => navigate(-1)}
-          className="mt-8 text-gray-600 hover:text-gray-900 font-semibold"
+          className="mt-8 text-white/80 hover:text-white font-semibold"
         >
           Cancel
         </button>

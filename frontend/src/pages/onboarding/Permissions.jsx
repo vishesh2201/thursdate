@@ -24,7 +24,7 @@ export default function Permissions() {
       if (currentStep === 1) {
         setCurrentStep(2); // Move to location permission
       } else if (currentStep === 2) {
-        navigate('/waitlist-status'); // Navigate to waitlist-status after location permission
+        navigate('/submission-progress'); // Navigate to submission-progress after location permission
       }
     } else {
       // If denied, just close the modal and stay on the current step
@@ -33,8 +33,8 @@ export default function Permissions() {
         // For notifications, if denied, still move to location as it's not critical path
         setCurrentStep(2);
       } else if (currentStep === 2) {
-        // For location, if denied, still navigate to waitlist-status
-        navigate('/waitlist-status');
+        // For location, if denied, still navigate to submission-progress
+        navigate('/submission-progress');
       }
     }
   };
@@ -44,7 +44,7 @@ export default function Permissions() {
     if (currentStep === 1) {
       setCurrentStep(2); // Move to location permission
     } else if (currentStep === 2) {
-      navigate('/waitlist-status'); // Navigate to waitlist-status after location permission
+      navigate('/submission-progress'); // Navigate to submission-progress after location permission
     }
   };
 

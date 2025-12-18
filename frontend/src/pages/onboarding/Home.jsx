@@ -75,31 +75,19 @@ export default function Home() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-white font-sans">
-      <div className="p-4 border-b">
-        <div className="flex items-center justify-between mb-2">
-          <button onClick={handleBack} className="w-6 h-6 flex items-center justify-center">
-            <img src="/backarrow.svg" alt="Back" width={24} height={24} />
-          </button>
-          <div className="text-gray-400 text-[14px] font-semibold mx-auto">
-            ThursDate.
-          </div>
-          <div style={{ width: 24 }}></div>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto pb-20 px-4">
+    <div className="h-screen flex flex-col font-sans overflow-hidden">
+      <div className="flex-1 overflow-hidden pb-28">
         <ContentComponent />
       </div>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-sm flex justify-around items-center h-16">
+      <nav className="fixed bottom-0 left-0 right-0 bg-black/40 backdrop-blur-xl border-t border-white/30 shadow-lg flex justify-around items-center h-24 px-2 rounded-t-3xl">
         {navOptions.map(opt => {
           const isActive = selected === opt.key;
           return (
             <button
               key={opt.key}
-              className={`flex-1 flex flex-col items-center justify-center transition-all focus:outline-none ${isActive ? "text-black font-bold" : "text-gray-400 font-normal"
+              className={`flex-1 flex flex-col items-center justify-center transition-all focus:outline-none px-2 py-2 rounded-2xl max-w-[80px] ${isActive ? "bg-white/40 backdrop-blur-md" : ""
                 }`}
               onClick={() => setSelected(opt.key)}
             >
@@ -109,13 +97,15 @@ export default function Home() {
                 className="mb-1"
                 style={{
                   filter: isActive
-                    ? "invert(0%) brightness(0)"
-                    : "invert(60%) brightness(1)",
+                    ? "brightness(0) saturate(100%) invert(85%) sepia(45%) saturate(480%) hue-rotate(358deg) brightness(100%) contrast(92%)"
+                    : "brightness(0) invert(1)",
                   width: 24,
                   height: 24,
                 }}
               />
-              <span className="text-xs mt-0.5">{opt.label}</span>
+              <span className={`text-xs mt-0.5 ${isActive ? "font-semibold" : "font-normal"}`} style={{ color: isActive ? "#F5CA72" : "white" }}>
+                {opt.label}
+              </span>
             </button>
           );
         })}
