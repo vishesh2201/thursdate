@@ -6,7 +6,7 @@ const LocationPermission = () => {
 
     const handleSkip = () => {
         // User chose to skip — go to submission progress
-        navigate('/submitting-profile');
+        navigate('/submission-progress');
     };
 
     const handleAllow = () => {
@@ -15,18 +15,18 @@ const LocationPermission = () => {
                 (position) => {
                     console.log('Geolocation granted:', position);
                     // proceed to submission progress
-                    navigate('/submitting-profile');
+                    navigate('/submission-progress');
                 },
                 (error) => {
                     console.warn('Geolocation error or denied', error);
-                    // still continue to submission
-                    navigate('/submitting-profile');
+                    // still continue to submission progress
+                    navigate('/submission-progress');
                 },
                 { enableHighAccuracy: true, timeout: 10000 }
             );
         } else {
             console.warn('Geolocation API not supported');
-            navigate('/submitting-profile');
+            navigate('/submission-progress');
         }
     };
 

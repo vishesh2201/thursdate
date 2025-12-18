@@ -21,44 +21,54 @@ export default function BlockedAccountsPage() {
     // For now, it just filters the user from the local list.
     // Later, you will add an API call here.
     console.log(`Unblocking user with ID: ${accountId}`);
-    setBlockedAccounts(currentAccounts => 
+    setBlockedAccounts(currentAccounts =>
       currentAccounts.filter(account => account.id !== accountId)
     );
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
+    <div
+      className="min-h-screen flex flex-col font-sans relative"
+      style={{
+        backgroundImage: "url('/bgs/faceverifybg.png')",
+        backgroundSize: 'cover',
+        backgroundPosition: 'center'
+      }}
+    >
+      <div className="absolute inset-0 bg-black/40"></div>
       {/* Top Bar */}
-      <div className="bg-white p-4 border-b border-gray-200">
-        <div className="flex items-center">
-          <button onClick={() => navigate(-1)} className="w-8 h-8 flex items-center justify-center">
-            <img src="/backarrow.svg" alt="Back" width={24} height={24} />
+      <div className="relative z-10 p-6 pt-12">
+        <div className="flex items-center justify-between mb-6">
+          <button onClick={() => navigate(-1)} className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M15 18l-6-6 6-6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </button>
-          <h1 className="flex-1 text-center text-lg font-semibold text-gray-800">Blocked accounts</h1>
-          <div style={{ width: 32 }}></div> {/* Spacer */}
+          <h1 className="flex-1 text-center text-xl font-semibold text-white">Blocked accounts</h1>
+          <div style={{ width: 40 }}></div>
         </div>
       </div>
 
       {/* Blocked Accounts List */}
-      <div className="flex-1 p-4">
+      <div className="relative z-10 flex-1 px-6 pb-6">
         {blockedAccounts.length > 0 ? (
-          <div className="bg-white rounded-lg shadow-sm">
+          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl overflow-hidden">
             {blockedAccounts.map((account, index) => (
-              <div 
-                key={account.id} 
-                className={`flex items-center justify-between p-4 ${index < blockedAccounts.length - 1 ? 'border-b border-gray-200' : ''}`}
+              <div
+                key={account.id}
+                className={`flex items-center justify-between p-4 ${index < blockedAccounts.length - 1 ? 'border-b border-white/10' : ''}`}
               >
                 <div className="flex items-center gap-4">
-                  <img 
-                    src={account.profilePicUrl} 
-                    alt={account.name} 
-                    className="w-12 h-12 rounded-full object-cover" 
+                  <img
+                    src={account.profilePicUrl}
+                    alt={account.name}
+                    className="w-12 h-12 rounded-full object-cover"
                   />
-                  <p className="font-semibold text-gray-800">{account.name}</p>
+                  <p className="font-semibold text-white">{account.name}</p>
                 </div>
-                <button 
+                <button
                   onClick={() => handleUnblock(account.id)}
-                  className="bg-black text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors"
+                  className="bg-white text-black text-sm font-semibold px-4 py-2 rounded-lg hover:bg-white/90 transition-colors"
                 >
                   Unblock
                 </button>
@@ -67,7 +77,7 @@ export default function BlockedAccountsPage() {
           </div>
         ) : (
           <div className="text-center py-20">
-            <p className="text-gray-500">You haven't blocked any accounts.</p>
+            <p className="text-white/60">You haven't blocked any accounts.</p>
           </div>
         )}
       </div>

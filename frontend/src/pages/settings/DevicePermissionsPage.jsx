@@ -71,37 +71,49 @@ export default function DevicePermissionsPage() {
   const [modalContent, setModalContent] = useState(null);
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col font-sans">
+    <div
+      className="min-h-screen flex flex-col font-sans relative"
+      style={{
+        backgroundImage: "url('/bgs/faceverifybg.png')",
+        backgroundSize: 'cover',
+        backgroundPosition: 'center'
+      }}
+    >
+      <div className="absolute inset-0 bg-black/40"></div>
       {/* Top Bar */}
-      <div className="bg-white p-4 border-b border-gray-200">
-        <div className="flex items-center">
-          <button onClick={() => navigate(-1)} className="w-8 h-8 flex items-center justify-center">
-            <img src="/backarrow.svg" alt="Back" width={24} height={24} />
+      <div className="relative z-10 p-6 pt-12">
+        <div className="flex items-center justify-between mb-6">
+          <button onClick={() => navigate(-1)} className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M15 18l-6-6 6-6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </button>
-          <h1 className="flex-1 text-center text-lg font-semibold text-gray-800">Device permissions</h1>
-          <div style={{ width: 32 }}></div> {/* Spacer */}
+          <h1 className="flex-1 text-center text-xl font-semibold text-white">Device permissions</h1>
+          <div style={{ width: 40 }}></div>
         </div>
       </div>
 
       {/* Permissions List */}
-      <div className="flex-1 p-4">
-        <div className="bg-white rounded-lg shadow-sm">
+      <div className="relative z-10 flex-1 px-6 pb-6">
+        <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl overflow-hidden">
           {permissionsData.map((permission, index) => (
             <button
               key={permission.key}
               onClick={() => setModalContent(permission)}
-              className={`flex items-center justify-between w-full p-4 text-left ${index < permissionsData.length - 1 ? 'border-b border-gray-200' : ''}`}
+              className={`flex items-center justify-between w-full p-4 text-left ${index < permissionsData.length - 1 ? 'border-b border-white/10' : ''}`}
             >
               <div>
-                <p className="font-semibold text-gray-800">{permission.title}</p>
-                <p className="text-sm text-gray-500">{permission.status}</p>
+                <p className="font-semibold text-white">{permission.title}</p>
+                <p className="text-sm text-white/60">{permission.status}</p>
               </div>
-              <img src="/right-icon.svg" alt="Arrow" className="w-4 h-4" />
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-white/60">
+                <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </button>
           ))}
         </div>
       </div>
-      
+
       {/* Render the Modal */}
       <PermissionModal content={modalContent} onClose={() => setModalContent(null)} />
     </div>

@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-// NOTE: Temporarily bypass backend for signup to allow frontend-only flow.
-// We'll create a mock token and a mock profile in localStorage so the rest of
-// the app (which supports mock mode) can operate without a database.
+import { authAPI } from "../../utils/api";
 
 const CARD_GLASS_ACTIVE =
   "bg-white/20 backdrop-blur-lg border border-white/30 text-white shadow-xl";
@@ -24,28 +22,13 @@ export default function Signup() {
     setLoading(true);
     setError("");
     try {
-      // Create a mock token and initial mock profile for frontend-only flow.
-      // Keep the same mock token prefix used by `src/utils/api.js` so mock mode
-      // is detected by the existing API helpers.
-      const MOCK_TOKEN_PREFIX = "MOCK_SANWARI_";
-      const MOCK_STORAGE_KEY = "mockUserProfile";
+      // Register user with the backend
+      await authAPI.register(email, password);
 
-      const mockToken = MOCK_TOKEN_PREFIX + Date.now();
-      localStorage.setItem('token', mockToken);
-
-      const initialProfile = {
-        email,
-        approval: false,
-        onboardingStage: 'initial',
-        onboardingComplete: false,
-      };
-
-      localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(initialProfile));
-
-      // Navigate to the first onboarding step as the original flow did.
+      // Navigate to user info to start onboarding
       navigate("/user-info");
     } catch (err) {
-      setError(err.message || 'Signup failed (client mock)');
+      setError(err.message || 'Signup failed');
     } finally {
       setLoading(false);
     }

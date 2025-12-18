@@ -19,16 +19,15 @@ const proPlans = [
 const PlanItem = ({ name, price, period, isCurrentPlan }) => (
   <div className="flex justify-between items-center py-3">
     <div>
-      <p className="font-semibold text-gray-800">{name}</p>
-      <p className="text-sm text-gray-500">{price} {period}</p>
+      <p className="font-semibold text-white">{name}</p>
+      <p className="text-sm text-white/60">{price} {period}</p>
     </div>
-    <button 
+    <button
       disabled={isCurrentPlan}
-      className={`text-sm font-semibold px-6 py-2 rounded-lg transition-colors ${
-        isCurrentPlan 
-          ? 'bg-gray-200 text-gray-500 cursor-not-allowed' 
-          : 'bg-black text-white hover:bg-gray-800'
-      }`}
+      className={`text-sm font-semibold px-6 py-2 rounded-lg transition-colors ${isCurrentPlan
+          ? 'bg-white/20 text-white/50 cursor-not-allowed'
+          : 'bg-white text-black hover:bg-white/90'
+        }`}
     >
       {isCurrentPlan ? 'Current' : 'Buy'}
     </button>
@@ -45,11 +44,11 @@ const PauseDeleteModal = ({ isOpen, onClose }) => {
   };
 
   return (
-    <div 
+    <div
       className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-end z-50"
       onClick={onClose}
     >
-      <div 
+      <div
         className="bg-white w-full max-w-md rounded-t-2xl p-6 text-center animate-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
@@ -92,69 +91,93 @@ export default function MembershipPage() {
   }, []);
 
   if (loading) {
-    return <div className="h-screen bg-white flex justify-center items-center">Loading...</div>;
+    return (
+      <div
+        className="h-screen flex justify-center items-center relative"
+        style={{
+          backgroundImage: "url('/bgs/faceverifybg.png')",
+          backgroundSize: 'cover',
+          backgroundPosition: 'center'
+        }}
+      >
+        <div className="absolute inset-0 bg-black/40"></div>
+        <p className="relative z-10 text-white">Loading...</p>
+      </div>
+    );
   }
-  
+
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col font-sans">
-      <div className="bg-white p-4 border-b border-gray-200">
-        <div className="flex items-center">
-          <button onClick={() => navigate(-1)} className="w-8 h-8 flex items-center justify-center">
-            <img src="/backarrow.svg" alt="Back" width={24} height={24} />
+    <div
+      className="min-h-screen flex flex-col font-sans relative"
+      style={{
+        backgroundImage: "url('/bgs/faceverifybg.png')",
+        backgroundSize: 'cover',
+        backgroundPosition: 'center'
+      }}
+    >
+      <div className="absolute inset-0 bg-black/40"></div>
+      <div className="relative z-10 p-6 pt-12">
+        <div className="flex items-center justify-between mb-6">
+          <button onClick={() => navigate(-1)} className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M15 18l-6-6 6-6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </button>
-          <h1 className="flex-1 text-center text-lg font-semibold text-gray-800">Manage membership</h1>
-          <div style={{ width: 32 }}></div>
+          <h1 className="flex-1 text-center text-xl font-semibold text-white">Manage membership</h1>
+          <div style={{ width: 40 }}></div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
+      <div className="relative z-10 flex-1 overflow-y-auto px-6 pb-6">
+        <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 mb-4">
           <div className="flex items-center gap-4">
             <img src={userInfo?.profilePicUrl || 'https://via.placeholder.com/50'} alt="Profile" className="w-12 h-12 rounded-full object-cover" />
             <div>
-              <p className="font-bold text-lg text-gray-900">{userInfo ? `${userInfo.firstName} ${userInfo.lastName}` : 'User Name'}</p>
-              <button onClick={() => navigate('/home', { state: { selectedTab: 'profile' } })} className="text-sm text-blue-600">My Profile &gt;</button>
+              <p className="font-bold text-lg text-white">{userInfo ? `${userInfo.firstName} ${userInfo.lastName}` : 'User Name'}</p>
+              <button onClick={() => navigate('/home', { state: { selectedTab: 'profile' } })} className="text-sm text-white/80">My Profile &gt;</button>
             </div>
           </div>
           <div className="mt-4 text-sm">
-            <p className="text-gray-800">Current membership: <span className="font-semibold">Luyona monthly</span></p>
-            <p className="text-gray-500">Renews on: Aug 28, 2025</p>
+            <p className="text-white">Current membership: <span className="font-semibold">Luyona monthly</span></p>
+            <p className="text-white/60">Renews on: Aug 28, 2025</p>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
-          <h2 className="text-md font-bold text-gray-800 mb-2">Basic plans</h2>
+        <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 mb-4">
+          <h2 className="text-md font-bold text-white mb-2">Basic plans</h2>
           {basicPlans.map(plan => (
-            <PlanItem 
-              key={plan.id} 
-              {...plan} 
-              isCurrentPlan={plan.id === currentPlanId} 
+            <PlanItem
+              key={plan.id}
+              {...plan}
+              isCurrentPlan={plan.id === currentPlanId}
             />
           ))}
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
-          <h2 className="text-md font-bold text-gray-800 mb-2">Pro plans</h2>
+        <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 mb-4">
+          <h2 className="text-md font-bold text-white mb-2">Pro plans</h2>
           {proPlans.map(plan => (
-            <PlanItem 
-              key={plan.id} 
-              {...plan} 
-              isCurrentPlan={plan.id === currentPlanId} 
+            <PlanItem
+              key={plan.id}
+              {...plan}
+              isCurrentPlan={plan.id === currentPlanId}
             />
           ))}
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm mb-4">
+        <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl mb-4">
           <button onClick={() => setIsModalOpen(true)} className="flex justify-between items-center w-full p-4 text-left">
             <div>
-              <h2 className="text-md font-bold text-gray-800">Pause or Delete Membership</h2>
-              <p className="text-sm text-gray-500 mt-1">This is for when you want to take a break from the app. Your profile and connections will be saved, and no one will be able to view or message you while you're away.</p>
+              <h2 className="text-md font-bold text-white">Pause or Delete Membership</h2>
+              <p className="text-sm text-white/60 mt-1">This is for when you want to take a break from the app. Your profile and connections will be saved, and no one will be able to view or message you while you're away.</p>
             </div>
-            <img src="/right-icon.svg" alt="Arrow" className="w-4 h-4" />
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-white/60 flex-shrink-0">
+              <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </button>
         </div>
       </div>
-      
+
       <PauseDeleteModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
   );

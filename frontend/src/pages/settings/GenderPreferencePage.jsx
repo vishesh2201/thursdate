@@ -6,11 +6,18 @@ const RadioOption = ({ label, checked, onClick }) => (
   <button
     type="button"
     onClick={onClick}
-    className={`w-full flex items-center justify-between px-5 py-4 mb-5 rounded-2xl border transition-all shadow-md bg-white text-left ${checked ? 'border-black shadow-lg' : 'border-gray-200'} hover:border-black`}
+    className={`w-full flex items-center justify-between px-5 py-4 mb-4 rounded-2xl transition-all ${checked
+        ? 'bg-white/15 border-2 border-white/40'
+        : 'bg-white/5 border-2 border-white/20'
+      }`}
   >
-    <div className="font-semibold text-base text-gray-900">{label}</div>
-    <span className={`ml-4 w-6 h-6 flex items-center justify-center rounded-full border-2 ${checked ? 'border-black' : 'border-gray-300'}`} style={{ minWidth: '24px' }}>
-      {checked && <span className="block w-3 h-3 bg-black rounded-full"></span>}
+    <div className="font-medium text-base text-white">{label}</div>
+    <span
+      className={`ml-4 w-5 h-5 flex items-center justify-center rounded-full border-2 ${checked ? 'border-white' : 'border-white/40'
+        }`}
+      style={{ minWidth: '20px' }}
+    >
+      {checked && <span className="block w-2.5 h-2.5 bg-white rounded-full"></span>}
     </span>
   </button>
 );
@@ -58,37 +65,83 @@ export default function GenderPreferencePage() {
   };
 
   if (initialLoading) {
-    return <div className="h-screen bg-white flex justify-center items-center">Loading...</div>;
+    return (
+      <div
+        className="h-screen flex justify-center items-center relative"
+        style={{
+          backgroundImage: "url('/bgs/faceverifybg.png')",
+          backgroundSize: 'cover',
+          backgroundPosition: 'center'
+        }}
+      >
+        <div className="absolute inset-0 bg-black/40"></div>
+        <p className="relative z-10 text-white">Loading...</p>
+      </div>
+    );
   }
-  
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <div className="bg-white p-4 border-b border-gray-200">
-        <div className="flex items-center">
-          <button onClick={() => navigate(-1)} className="w-8 h-8 flex items-center justify-center">
-            <img src="/backarrow.svg" alt="Back" width={24} height={24} />
+    <div
+      className="min-h-screen flex flex-col relative"
+      style={{
+        backgroundImage: "url('/bgs/faceverifybg.png')",
+        backgroundSize: 'cover',
+        backgroundPosition: 'center'
+      }}
+    >
+      <div className="absolute inset-0 bg-black/40"></div>
+      <div className="absolute inset-0 bg-black/40"></div>
+      {/* Header */}
+      <div className="relative z-10 p-6 pt-12">
+        <div className="flex items-center justify-between mb-8">
+          <button
+            onClick={() => navigate(-1)}
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-sm border border-white/20"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M15 18l-6-6 6-6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </button>
-          <div style={{ width: 32 }}></div> {/* Spacer */}
+          <div className="text-white text-xl font-semibold">Sundate</div>
+          <div style={{ width: 40 }}></div>
+        </div>
+
+        {/* Progress bar */}
+        <div className="w-full h-0.5 bg-white/20 rounded-full mb-8">
+          <div className="w-full h-full bg-white rounded-full"></div>
         </div>
       </div>
 
-      <div className="flex-1 p-6">
-        <h1 className="text-2xl font-semibold text-gray-800 mb-6">Who are you interested in meeting?</h1>
+      {/* Content */}
+      <div className="relative z-10 flex-1 px-6 pb-6">
+        <h1 className="text-[28px] font-normal text-white mb-8 leading-tight">
+          Who are you interested in meeting?
+        </h1>
+
         <RadioOption label="Women" checked={interestedGender === 'Women'} onClick={() => setInterestedGender('Women')} />
         <RadioOption label="Men" checked={interestedGender === 'Men'} onClick={() => setInterestedGender('Men')} />
         <RadioOption label="Anyone" checked={interestedGender === 'Anyone'} onClick={() => setInterestedGender('Anyone')} />
       </div>
-      
-      {error && <p className="text-red-500 text-center mb-4">{error}</p>}
 
-      <div className="sticky bottom-0 bg-white p-4 border-t border-gray-200">
+      {error && (
+        <div className="relative z-10 px-6 pb-4">
+          <p className="text-red-400 text-center bg-red-900/20 backdrop-blur-sm rounded-xl p-3 border border-red-500/30">{error}</p>
+        </div>
+      )}
+
+      {/* Bottom button */}
+      <div className="relative z-10 p-6 pt-0 pb-8">
         <button
           onClick={handleSave}
           disabled={isSaving || !interestedGender}
-          className="w-full py-4 rounded-2xl text-white font-semibold text-base bg-black disabled:bg-gray-300"
+          className="w-full py-4 rounded-full text-black font-semibold text-base bg-white disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isSaving ? 'Saving...' : 'Save'}
+          {isSaving ? 'Saving...' : 'Next'}
         </button>
+        {/* Bottom indicator */}
+        <div className="flex justify-center mt-4">
+          <div className="w-32 h-1 bg-white/30 rounded-full"></div>
+        </div>
       </div>
     </div>
   );

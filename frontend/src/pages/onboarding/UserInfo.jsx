@@ -64,6 +64,38 @@ export default function UserInfo() {
 
   const navigate = useNavigate();
 
+  // Load existing profile data
+  useEffect(() => {
+    let mounted = true;
+    const loadProfile = async () => {
+      try {
+        const userData = await userAPI.getProfile();
+        if (!mounted) return;
+
+        if (userData.firstName) setFirstName(userData.firstName);
+        if (userData.lastName) setLastName(userData.lastName);
+        if (userData.gender) {
+          if (['Male', 'Female', 'Non-binary'].includes(userData.gender)) {
+            setGender(userData.gender);
+          } else {
+            setGender('Other');
+            setCustomGender(userData.gender);
+          }
+        }
+        if (userData.dob) setDob(userData.dob);
+        if (userData.currentLocation) setCurrentLocation(userData.currentLocation);
+        if (userData.favouriteTravelDestination) setFavouriteTravelDestination(userData.favouriteTravelDestination);
+        if (userData.lastHolidayPlaces) setLastHolidayPlaces(userData.lastHolidayPlaces);
+        if (userData.favouritePlacesToGo) setFavouritePlacesToGo(userData.favouritePlacesToGo);
+        if (userData.profilePicUrl) setProfilePicUrl(userData.profilePicUrl);
+      } catch (err) {
+        console.error('Failed to load profile', err);
+      }
+    };
+    loadProfile();
+    return () => { mounted = false; };
+  }, []);
+
   // Effect to synchronize picker states when DOB changes or picker is shown
   useEffect(() => {
     const initialDate = dob ? new Date(dob) : new Date();

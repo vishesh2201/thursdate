@@ -13,9 +13,6 @@ import Login from "./pages/onboarding/Login";
 import Signup from "./pages/onboarding/Signup";
 import Home from "./pages/onboarding/Home";
 import SettingsTab from "./pages/tabs/SettingsTab";
-import EditProfileTab from "./pages/edits/EditProfileTab";
-import EditProfilePicture from "./pages/edits/EditProfilePicture";
-import EditLifestyleImages from "./pages/edits/EditLifestyleImages";
 import UserIntent from "./pages/onboarding/UserIntent";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -29,6 +26,8 @@ import AccountPrivacy from "./pages/settings/AccountPrivacyPage";
 import BlockedAccounts from "./pages/settings/BlockedAccountsPage";
 import Membership from "./pages/settings/MembershipPage";
 import DevicePermissions from "./pages/settings/DevicePermissionsPage";
+import ChatConversation from "./pages/tabs/ChatConversation";
+import GameConnection from "./pages/tabs/GameConnection";
 
 import "@ncdai/react-wheel-picker/style.css";
 import Verification from "./pages/onboarding/Verification";
@@ -36,6 +35,8 @@ import FaceVerification from "./pages/onboarding/FaceVerification";
 import NotificationPermission from "./pages/onboarding/NotificationPermission";
 import LocationPermission from "./pages/onboarding/LocationPermission";
 import SubmissionProgress from "./pages/onboarding/SubmissionProgress";
+import ProfileQuestions from "./pages/onboarding/ProfileQuestions";
+import ProfilePhotos from "./pages/onboarding/ProfilePhotos";
 
 export default function App() {
   return (
@@ -54,16 +55,15 @@ export default function App() {
         <Route path="/face-verification" element={<FaceVerification />} />
         <Route path="/notification-permission" element={<NotificationPermission />} />
         <Route path="/location-permission" element={<LocationPermission />} />
-        <Route path="/submitting-profile" element={<SubmissionProgress />} />
+        <Route path="/submission-progress" element={<SubmissionProgress />} />
         <Route path="/waitlist-status" element={<WaitlistStatus />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/home" element={<Home />} />
         <Route path="/settings" element={<SettingsTab />} />
-        <Route path="/edit-profile" element={<EditProfileTab />} />
-        <Route path="/edit-profile-picture" element={<EditProfilePicture />} />
-        <Route path="/edit-lifestyle-images" element={<EditLifestyleImages />} />
         <Route path="/user-intent" element={<UserIntent />} />
+        <Route path="/profile-questions" element={<ProfileQuestions />} />
+        <Route path="/profile-photos" element={<ProfilePhotos />} />
 
         {/* Admin Routes */}
         <Route path="/admin-login" element={<AdminLogin />} />
@@ -80,6 +80,10 @@ export default function App() {
         <Route path="/settings/blocked-accounts" element={<BlockedAccounts />} />
         <Route path="/settings/membership" element={<Membership />} />
         <Route path="/settings/device-permissions" element={<DevicePermissions />} />
+
+        {/* Chat Routes */}
+        <Route path="/chat-conversation" element={<ChatConversation />} />
+        <Route path="/game-connection" element={<GameConnection />} />
 
       </Routes>
     </Router>

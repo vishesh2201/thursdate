@@ -1,9 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { userAPI } from "../../utils/api";
-
-// Temporarily bypass backend for login: create a mock token in localStorage
-// and ensure a mock profile exists so the app's mock-mode paths work.
+import { authAPI, userAPI } from "../../utils/api";
 
 const CARD_GLASS_ACTIVE =
   "bg-white/20 backdrop-blur-lg border border-white/30 text-white shadow-xl";
@@ -25,57 +22,34 @@ export default function Login() {
     setLoading(true);
     setError("");
     try {
-      // Create mock token so userAPI will operate in mock mode.
-      const MOCK_TOKEN_PREFIX = "MOCK_SANWARI_";
-      const MOCK_STORAGE_KEY = "mockUserProfile";
+      // Login with the backend
+      await authAPI.login(email, password);
 
-      // Set a mock token regardless of the entered credentials so the app
-      // can function without a backend. If a mock profile already exists
-      // in localStorage we'll reuse it; otherwise create a minimal one.
-      const mockToken = MOCK_TOKEN_PREFIX + Date.now();
-      localStorage.setItem('token', mockToken);
+      // Get user profile to determine where to navigate
+      const userData = await userAPI.getProfile();
 
-      const existing = localStorage.getItem(MOCK_STORAGE_KEY);
-      if (!existing) {
-        const initialProfile = {
-          approval: false,
-          onboardingStage: 'initial',
-          onboardingComplete: false,
-        };
-        localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(initialProfile));
+      // If approved and onboarding complete, go to home
+      if (userData.approval && userData.onboardingComplete) {
+        navigate("/home");
+        return;
       }
 
-      // Use userAPI.getProfile() to obtain the mock profile and follow the
-      // same routing logic as the original implementation.
-      try {
-        const userData = await userAPI.getProfile();
-
-        if (userData.approval && userData.onboardingComplete) {
-          navigate("/home");
-          return;
-        }
-
-        if (userData.onboardingStage === "initial" || !userData.firstName) {
-          navigate("/user-info");
-          return;
-        }
-
-        if (userData.onboardingStage === "info_complete") {
-          navigate("/referral");
-          return;
-        }
-
-        if (userData.approval && !userData.onboardingComplete) {
-          navigate("/user-intent");
-          return;
-        }
-
+      // If not approved yet, go to waitlist status
+      if (!userData.approval) {
         navigate("/waitlist-status");
-      } catch (profileError) {
-        navigate("/user-info");
+        return;
       }
+
+      // If approved but onboarding not complete, go to user-intent
+      if (userData.approval && !userData.onboardingComplete) {
+        navigate("/user-intent");
+        return;
+      }
+
+      // Default fallback
+      navigate("/waitlist-status");
     } catch (err) {
-      setError(err.message || 'Login failed (client mock)');
+      setError(err.message || 'Login failed');
     } finally {
       setLoading(false);
     }

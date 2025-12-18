@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import emailConfirmIcon from "../../../public/email-confirm-icon.svg";
+import { userAPI } from '../../utils/api';
 
 export default function SocialPresence() {
     const navigate = useNavigate();
@@ -94,10 +95,26 @@ export default function SocialPresence() {
         setShowCodeInput(true);
     };
 
-    const handleVerifyCode = () => {
+    const handleVerifyCode = async () => {
         const requiredLength = verificationMethod === "aadhaar" ? 6 : 4;
         if (instaCode.length === requiredLength) {
             setCodeVerified(true);
+
+            // Save Instagram/LinkedIn to database
+            if (verificationMethod === "instagram" || verificationMethod === "linkedin") {
+                try {
+                    const updateData = {};
+                    if (verificationMethod === "instagram") {
+                        updateData.instagram = instagram.startsWith('@') ? instagram.substring(1) : instagram;
+                    } else if (verificationMethod === "linkedin") {
+                        updateData.linkedin = instagram; // Full URL or username
+                    }
+                    await userAPI.updateProfile(updateData);
+                } catch (err) {
+                    console.error('Failed to save social profile:', err);
+                    // Continue anyway - don't block user
+                }
+            }
         }
     };
 

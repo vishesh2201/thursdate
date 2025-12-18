@@ -72,7 +72,7 @@ export default function ApplicationStatus() {
           {/* Button - sticks to the bottom */}
           <div className="w-full max-w-xs"> {/* Wrapper for button to control its width */}
             <button
-              onClick={() => navigate('/permissions')}
+              onClick={() => navigate('/waitlist-status')}
               className="w-full py-4 rounded-xl bg-[#222222] text-white font-medium text-sm hover:bg-[#333333] transition-colors"
             >
               Next
