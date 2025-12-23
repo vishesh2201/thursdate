@@ -307,4 +307,211 @@ router.get('/matches/potential', auth, async (req, res) => {
     }
 });
 
+// Record a match action (like or skip)
+router.post('/matches/action', auth, async (req, res) => {
+    const connection = await pool.getConnection();
+    
+    try {
+        const { targetUserId, actionType } = req.body;
+        const userId = req.user.userId;
+
+        // Validate input
+        if (!targetUserId || !actionType) {
+            return res.status(400).json({ error: 'Target user ID and action type are required' });
+        }
+
+        if (!['like', 'skip'].includes(actionType)) {
+            return res.status(400).json({ error: 'Action type must be "like" or "skip"' });
+        }
+
+        // Prevent self-actions
+        if (userId === targetUserId) {
+            return res.status(400).json({ error: 'Cannot perform action on yourself' });
+        }
+
+        await connection.beginTransaction();
+
+        // Combined query: Insert action AND check for mutual match in single query
+        // This is more efficient than separate queries
+        const [result] = await connection.execute(
+            `INSERT INTO user_actions (user_id, target_user_id, action_type) 
+             VALUES (?, ?, ?)
+             ON DUPLICATE KEY UPDATE action_type = ?, created_at = CURRENT_TIMESTAMP`,
+            [userId, targetUserId, actionType, actionType]
+        );
+
+        let isMutualMatch = false;
+        let matchData = null;
+
+        // Only check for mutual match if this is a like
+        if (actionType === 'like') {
+            // Optimized query: Get target user info AND check mutual like in one query
+            const [mutualCheck] = await connection.execute(
+                `SELECT u.id, u.first_name, u.last_name, u.profile_pic_url
+                 FROM user_actions a
+                 JOIN users u ON u.id = a.user_id
+                 WHERE a.user_id = ? 
+                   AND a.target_user_id = ? 
+                   AND a.action_type = 'like'
+                   AND u.approval = true`,
+                [targetUserId, userId]
+            );
+
+            if (mutualCheck.length > 0) {
+                isMutualMatch = true;
+                matchData = {
+                    userId: mutualCheck[0].id,
+                    firstName: mutualCheck[0].first_name,
+                    lastName: mutualCheck[0].last_name,
+                    profilePicUrl: mutualCheck[0].profile_pic_url
+                };
+            }
+        }
+
+        await connection.commit();
+
+        res.json({ 
+            success: true, 
+            action: actionType,
+            isMutualMatch,
+            matchData
+        });
+
+    } catch (error) {
+        await connection.rollback();
+        console.error('Match action error:', error);
+        
+        // Handle specific database errors
+        if (error.code === 'ER_NO_REFERENCED_ROW_2') {
+            return res.status(404).json({ error: 'Target user not found' });
+        }
+        
+        res.status(500).json({ error: 'Internal server error: ' + error.message });
+    } finally {
+        connection.release();
+    }
+});
+
+// Get mutual matches
+router.get('/matches/mutual', auth, async (req, res) => {
+    try {
+        if (!(await validateConnection())) {
+            return res.status(500).json({ error: 'Database connection failed' });
+        }
+
+        const userId = req.user.userId;
+
+        // Get all mutual matches using the view or direct query
+        const [matches] = await pool.execute(
+            `SELECT DISTINCT
+                u.id, u.email, u.first_name, u.last_name, u.gender, u.dob, 
+                u.current_location, u.from_location, u.profile_pic_url, u.intent,
+                u.interests, u.height, u.relationship_status,
+                a2.created_at as matched_at
+             FROM user_actions a1
+             JOIN user_actions a2 
+                ON a1.user_id = a2.target_user_id 
+                AND a1.target_user_id = a2.user_id
+             JOIN users u ON u.id = a1.target_user_id
+             WHERE a1.user_id = ? 
+                AND a1.action_type = 'like' 
+                AND a2.action_type = 'like'
+             ORDER BY a2.created_at DESC`,
+            [userId]
+        );
+
+        // Parse JSON fields and calculate age
+        const mutualMatches = matches.map(user => {
+            let age = null;
+            if (user.dob) {
+                const birthDate = new Date(user.dob);
+                const today = new Date();
+                age = today.getFullYear() - birthDate.getFullYear();
+                const m = today.getMonth() - birthDate.getMonth();
+                if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                    age--;
+                }
+            }
+
+            return {
+                id: user.id,
+                email: user.email,
+                firstName: user.first_name,
+                lastName: user.last_name,
+                age: age,
+                gender: user.gender,
+                currentLocation: user.current_location,
+                fromLocation: user.from_location,
+                profilePicUrl: user.profile_pic_url,
+                height: user.height,
+                relationshipStatus: user.relationship_status,
+                interests: safeJsonParse(user.interests, []),
+                intent: safeJsonParse(user.intent, {}),
+                matchedAt: user.matched_at
+            };
+        });
+
+        res.json({ matches: mutualMatches });
+
+    } catch (error) {
+        console.error('Get mutual matches error:', error);
+        res.status(500).json({ error: 'Internal server error: ' + error.message });
+    }
+});
+
+// Get users who liked you
+router.get('/matches/likes-received', auth, async (req, res) => {
+    try {
+        if (!(await validateConnection())) {
+            return res.status(500).json({ error: 'Database connection failed' });
+        }
+
+        const userId = req.user.userId;
+
+        // Get all users who liked the current user
+        const [likes] = await pool.execute(
+            `SELECT DISTINCT
+                u.id, u.first_name, u.last_name, u.profile_pic_url, u.gender, u.dob,
+                a.created_at as liked_at
+             FROM user_actions a
+             JOIN users u ON u.id = a.user_id
+             WHERE a.target_user_id = ? 
+                AND a.action_type = 'like'
+                AND u.approval = true
+             ORDER BY a.created_at DESC`,
+            [userId]
+        );
+
+        // Calculate age for each user
+        const likesReceived = likes.map(user => {
+            let age = null;
+            if (user.dob) {
+                const birthDate = new Date(user.dob);
+                const today = new Date();
+                age = today.getFullYear() - birthDate.getFullYear();
+                const m = today.getMonth() - birthDate.getMonth();
+                if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                    age--;
+                }
+            }
+
+            return {
+                id: user.id,
+                firstName: user.first_name,
+                lastName: user.last_name,
+                age: age,
+                gender: user.gender,
+                profilePicUrl: user.profile_pic_url,
+                likedAt: user.liked_at
+            };
+        });
+
+        res.json({ likes: likesReceived });
+
+    } catch (error) {
+        console.error('Get likes received error:', error);
+        res.status(500).json({ error: 'Internal server error: ' + error.message });
+    }
+});
+
 module.exports = router;

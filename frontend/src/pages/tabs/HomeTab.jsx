@@ -27,6 +27,10 @@ export default function HomeTab() {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
+  // Match notification state
+  const [showMatchNotification, setShowMatchNotification] = useState(false);
+  const [matchedUser, setMatchedUser] = useState(null);
+
   // Fetch potential matches on component mount
   useEffect(() => {
     const fetchMatches = async () => {
@@ -142,30 +146,65 @@ export default function HomeTab() {
     setIsDragging(false);
   };
 
-  const handleLike = () => {
-    console.log('Liked user:', currentCandidate?.id);
-    // TODO: Send like to backend API
-    // Move to next candidate
-    if (currentCandidateIndex < candidates.length - 1) {
-      setCurrentCandidateIndex(currentCandidateIndex + 1);
-    } else {
-      // No more candidates
-      setCurrentCandidateIndex(-1);
+  const handleLike = async () => {
+    if (!currentCandidate) return;
+
+    try {
+      const response = await userAPI.recordMatchAction(currentCandidate.id, 'like');
+
+      // Check if it's a mutual match
+      if (response.isMutualMatch) {
+        setMatchedUser(response.matchData);
+        setShowMatchNotification(true);
+
+        // Auto-hide notification after 5 seconds
+        setTimeout(() => {
+          setShowMatchNotification(false);
+        }, 5000);
+      }
+
+      // Move to next candidate
+      if (currentCandidateIndex < candidates.length - 1) {
+        setCurrentCandidateIndex(currentCandidateIndex + 1);
+      } else {
+        // No more candidates
+        setCurrentCandidateIndex(-1);
+      }
+      setIsMinimized(false);
+    } catch (error) {
+      console.error('Error liking user:', error);
+      // Still move to next candidate even if API fails
+      if (currentCandidateIndex < candidates.length - 1) {
+        setCurrentCandidateIndex(currentCandidateIndex + 1);
+      } else {
+        setCurrentCandidateIndex(-1);
+      }
     }
-    setIsMinimized(false);
   };
 
-  const handleSkip = () => {
-    console.log('Skipped user:', currentCandidate?.id);
-    // TODO: Send skip to backend API
-    // Move to next candidate
-    if (currentCandidateIndex < candidates.length - 1) {
-      setCurrentCandidateIndex(currentCandidateIndex + 1);
-    } else {
-      // No more candidates
-      setCurrentCandidateIndex(-1);
+  const handleSkip = async () => {
+    if (!currentCandidate) return;
+
+    try {
+      await userAPI.recordMatchAction(currentCandidate.id, 'skip');
+
+      // Move to next candidate
+      if (currentCandidateIndex < candidates.length - 1) {
+        setCurrentCandidateIndex(currentCandidateIndex + 1);
+      } else {
+        // No more candidates
+        setCurrentCandidateIndex(-1);
+      }
+      setIsMinimized(false);
+    } catch (error) {
+      console.error('Error skipping user:', error);
+      // Still move to next candidate even if API fails
+      if (currentCandidateIndex < candidates.length - 1) {
+        setCurrentCandidateIndex(currentCandidateIndex + 1);
+      } else {
+        setCurrentCandidateIndex(-1);
+      }
     }
-    setIsMinimized(false);
   };
 
   const handleGoBack = () => {
@@ -463,7 +502,41 @@ export default function HomeTab() {
             </div>
           </>
         )}
-      </div>      {/* Bottom Navigation */}
+      </div>
+
+      {/* Match Notification Modal */}
+      {showMatchNotification && matchedUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md">
+          <div className="bg-gradient-to-br from-purple-600 to-pink-600 rounded-3xl p-8 mx-6 max-w-sm shadow-2xl animate-bounce-once">
+            <div className="text-center">
+              <div className="text-6xl mb-4">🎉</div>
+              <h2 className="text-white text-2xl font-bold mb-2">It's a Match!</h2>
+              <p className="text-white/90 text-base mb-6">
+                You and {matchedUser.firstName} {matchedUser.lastName} liked each other
+              </p>
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={() => setShowMatchNotification(false)}
+                  className="px-6 py-3 bg-white/20 backdrop-blur-md text-white rounded-full font-semibold hover:bg-white/30 transition-all"
+                >
+                  Keep Swiping
+                </button>
+                <button
+                  onClick={() => {
+                    setShowMatchNotification(false);
+                    handleGoToChat();
+                  }}
+                  className="px-6 py-3 bg-white text-purple-600 rounded-full font-semibold hover:bg-white/90 transition-all"
+                >
+                  Send Message
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-black/40 backdrop-blur-xl border-t border-white/30 shadow-lg flex justify-around items-center h-24 px-2 rounded-t-3xl">
         {navOptions.map(opt => {
           const isActive = selected === opt.key;

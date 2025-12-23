@@ -290,6 +290,39 @@ export const userAPI = {
 
         return authRequest('/user/matches/potential');
     },
+
+    // Record match action (like or skip)
+    recordMatchAction: async (targetUserId, actionType) => {
+        if (isMockMode()) {
+            console.log(`MOCK MODE: Recording ${actionType} for user ${targetUserId}`);
+            return { success: true, action: actionType, isMutualMatch: false };
+        }
+
+        return authRequest('/user/matches/action', {
+            method: 'POST',
+            body: JSON.stringify({ targetUserId, actionType })
+        });
+    },
+
+    // Get mutual matches
+    getMutualMatches: async () => {
+        if (isMockMode()) {
+            console.log("MOCK MODE: Returning empty mutual matches array");
+            return { matches: [] };
+        }
+
+        return authRequest('/user/matches/mutual');
+    },
+
+    // Get users who liked you
+    getLikesReceived: async () => {
+        if (isMockMode()) {
+            console.log("MOCK MODE: Returning empty likes received array");
+            return { likes: [] };
+        }
+
+        return authRequest('/user/matches/likes-received');
+    },
 };
 
 // Admin API (LIVE MODE ONLY)
