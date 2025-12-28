@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { userAPI } from "../../utils/api";
+import { useNavigate } from "react-router-dom";
+import { userAPI, chatAPI } from "../../utils/api";
 
 const navOptions = [
   { key: "matches", label: "Matches", icon: "/matches-icon.svg" },
@@ -10,6 +11,7 @@ const navOptions = [
 ];
 
 export default function HomeTab() {
+  const navigate = useNavigate();
   const [selected, setSelected] = useState("matches");
   const [currentCandidateIndex, setCurrentCandidateIndex] = useState(0);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -215,9 +217,30 @@ export default function HomeTab() {
     }
   };
 
-  const handleGoToChat = () => {
-    console.log('Go to chat with user:', currentCandidate?.id);
-    // TODO: Navigate to chat
+  const handleGoToChat = async () => {
+    if (!matchedUser) return;
+    
+    try {
+      // Create or get conversation with matched user
+      const { conversationId } = await chatAPI.createConversation(matchedUser.userId);
+      
+      // Navigate to chat conversation
+      navigate('/chat-conversation', {
+        state: {
+          conversationId,
+          otherUser: {
+            id: matchedUser.userId,
+            name: `${matchedUser.firstName} ${matchedUser.lastName}`,
+            firstName: matchedUser.firstName,
+            lastName: matchedUser.lastName,
+            profilePicUrl: matchedUser.profilePicUrl,
+            location: matchedUser.currentLocation
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error navigating to chat:', error);
+    }
   };
 
   return (

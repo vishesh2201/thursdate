@@ -1,39 +1,178 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { chatAPI } from '../../utils/api';
+import socketService from '../../utils/socket';
 
 export default function ChatConversation() {
     const navigate = useNavigate();
     const location = useLocation();
-    const { chat } = location.state || {};
+    const { conversationId, otherUser } = location.state || {};
     const [message, setMessage] = useState('');
+    const [messages, setMessages] = useState([]);
     const [showMenu, setShowMenu] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [isTyping, setIsTyping] = useState(false);
+    const [isOnline, setIsOnline] = useState(false);
+    const [isRecording, setIsRecording] = useState(false);
+    const [recordingTime, setRecordingTime] = useState(0);
+    const [selectedMessage, setSelectedMessage] = useState(null);
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const menuRef = useRef(null);
-    const [messages, setMessages] = useState([
-        { id: 1, text: 'Hi! Jacob!!', time: '12:34 pm', isSent: false },
-        { id: 2, text: 'Hi Sana!!', time: '12:34 pm', isSent: true },
-        { id: 3, text: "How's your day?", time: '12:34 pm', isSent: false },
-        { id: 4, text: 'Pretty chill. Just got back from work. You?', time: '12:34 pm', isSent: true },
-        { id: 5, text: 'Same. Trying to survive emails 😅', time: '12:34 pm', isSent: false },
-    ]);
+    const messagesEndRef = useRef(null);
+    const typingTimeoutRef = useRef(null);
+    const mediaRecorderRef = useRef(null);
+    const audioChunksRef = useRef([]);
+    const recordingIntervalRef = useRef(null);
 
-    const handleSendMessage = () => {
-        if (message.trim()) {
-            const now = new Date();
-            const timeString = now.toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true
-            });
+    // Normalize message timestamp - ensure createdAt exists
+   const normalizeMessage = (msg, isLocal = false) => {
+    return {
+        ...msg,
+        createdAt: isLocal
+            ? new Date().toISOString()   // FORCE current time for sent messages
+            : msg.createdAt || msg.created_at
+    };
+};
 
-            const newMessage = {
-                id: messages.length + 1,
-                text: message,
-                time: timeString.toLowerCase(),
-                isSent: true
-            };
 
-            setMessages([...messages, newMessage]);
-            setMessage('');
+    useEffect(() => {
+        if (!conversationId || !otherUser) {
+            navigate('/home', { state: { selectedTab: 'chats' } });
+            return;
+        }
+
+        loadMessages();
+        
+        // Ensure socket is connected before joining
+        const token = localStorage.getItem('token');
+        if (token && !socketService.isConnected()) {
+            console.log('Socket not connected, connecting now...');
+            socketService.connect(token);
+        }
+        
+        // Join conversation room (with slight delay to ensure socket is ready)
+        setTimeout(() => {
+            console.log('Joining conversation room:', conversationId, 'Socket connected:', socketService.isConnected());
+            socketService.joinConversation(conversationId);
+        }, 100);
+
+        // Listen for new messages
+        socketService.onNewMessage(({ conversationId: msgConvId, message: newMsg }) => {
+            if (msgConvId === conversationId) {
+                // Get current user from localStorage to set isSent properly
+                const token = localStorage.getItem('token');
+                const currentUserId = token ? JSON.parse(atob(token.split('.')[1])).userId : null;
+                
+                // Ensure isSent is set correctly based on current user
+                const messageWithCorrectSent = normalizeMessage({
+                    ...newMsg,
+                    isSent: newMsg.senderId === currentUserId
+                });
+                
+                setMessages(prev => [...prev, messageWithCorrectSent]);
+                scrollToBottom();
+                
+                // Mark as read if not sent by current user
+                if (!messageWithCorrectSent.isSent) {
+                    socketService.markMessagesAsRead(conversationId, [newMsg.id]);
+                    chatAPI.markAsRead(conversationId);
+                }
+            }
+        });
+
+        // Listen for typing events
+        socketService.onUserTyping(({ conversationId: typingConvId, userId, isTyping: typing }) => {
+            if (typingConvId === conversationId && userId === otherUser.id) {
+                setIsTyping(typing);
+            }
+        });
+
+        // Listen for read receipts
+        socketService.onMessagesRead(({ conversationId: readConvId, messageIds }) => {
+            if (readConvId === conversationId) {
+                setMessages(prev => prev.map(msg => 
+                    messageIds.includes(msg.id) ? { ...msg, isRead: true } : msg
+                ));
+            }
+        });
+
+        // Listen for user status changes
+        socketService.onUserStatus(({ userId, isOnline: online }) => {
+            if (userId === otherUser.id) {
+                setIsOnline(online);
+            }
+        });
+
+        // Request current status of other user
+        socketService.requestUserStatus(otherUser.id);
+
+        // Listen for message deletions
+        socketService.on('message_deleted', (data) => {
+            console.log('Received message_deleted event:', data);
+            if (data.deleteType === 'for_everyone') {
+                setMessages(prev => {
+                    console.log('Filtering message ID:', data.messageId, 'from', prev.length, 'messages');
+                    return prev.filter(msg => msg.id !== data.messageId);
+                });
+            }
+        });
+
+        return () => {
+            socketService.leaveConversation(conversationId);
+            socketService.off('new_message');
+            socketService.off('user_typing');
+            socketService.off('messages_read');
+            socketService.off('user_status');
+            socketService.off('message_deleted');
+        };
+    }, [conversationId, otherUser, navigate]);
+
+    const loadMessages = async () => {
+        try {
+            setLoading(true);
+            const data = await chatAPI.getMessages(conversationId);
+            // Normalize all loaded messages
+            const normalizedMessages = data.map(normalizeMessage);
+            setMessages(normalizedMessages);
+            scrollToBottom();
+            
+            // Mark unread messages as read
+            const unreadIds = normalizedMessages.filter(msg => !msg.isRead && !msg.isSent).map(msg => msg.id);
+            if (unreadIds.length > 0) {
+                await chatAPI.markAsRead(conversationId);
+                socketService.markMessagesAsRead(conversationId, unreadIds);
+            }
+        } catch (error) {
+            console.error('Failed to load messages:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const scrollToBottom = () => {
+        setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+    };
+
+    const handleSendMessage = async () => {
+        if (!message.trim()) return;
+
+        const textToSend = message.trim();
+        setMessage('');
+        
+        // Stop typing indicator
+        socketService.stopTyping(conversationId, otherUser.id);
+
+        try {
+            const newMsg = await chatAPI.sendMessage(conversationId, 'text', textToSend);
+            // Normalize the sent message
+            const normalizedMsg = normalizeMessage(newMsg, true );
+            setMessages(prev => [...prev, normalizedMsg]);
+            scrollToBottom();
+        } catch (error) {
+            console.error('Failed to send message:', error);
+            // Optionally show error to user
         }
     };
 
@@ -42,6 +181,182 @@ export default function ChatConversation() {
             handleSendMessage();
         }
     };
+
+    const handleTyping = (e) => {
+        setMessage(e.target.value);
+        
+        // Clear previous timeout
+        if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+        }
+        
+        // Start typing
+        if (e.target.value.length > 0) {
+            socketService.startTyping(conversationId, otherUser.id);
+            
+            // Stop typing after 2 seconds of inactivity
+            typingTimeoutRef.current = setTimeout(() => {
+                socketService.stopTyping(conversationId, otherUser.id);
+            }, 2000);
+        } else {
+            socketService.stopTyping(conversationId, otherUser.id);
+        }
+    };
+
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = mediaRecorder;
+            audioChunksRef.current = [];
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audioChunksRef.current.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+                await sendVoiceMessage(audioBlob, recordingTime);
+                
+                // Stop all tracks
+                stream.getTracks().forEach(track => track.stop());
+                
+                // Reset recording state
+                setRecordingTime(0);
+            };
+
+            mediaRecorder.start();
+            setIsRecording(true);
+            setRecordingTime(0);
+
+            // Start timer
+            recordingIntervalRef.current = setInterval(() => {
+                setRecordingTime(prev => prev + 1);
+            }, 1000);
+        } catch (error) {
+            console.error('Failed to start recording:', error);
+            alert('Microphone access denied. Please allow microphone access to send voice messages.');
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+            
+            if (recordingIntervalRef.current) {
+                clearInterval(recordingIntervalRef.current);
+            }
+        }
+    };
+
+    const cancelRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+            setRecordingTime(0);
+            
+            if (recordingIntervalRef.current) {
+                clearInterval(recordingIntervalRef.current);
+            }
+            
+            // Stop all tracks without sending
+            if (mediaRecorderRef.current.stream) {
+                mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+            }
+            
+            audioChunksRef.current = [];
+        }
+    };
+
+    const sendVoiceMessage = async (audioBlob, duration) => {
+        try {
+            // Upload audio to backend
+            const formData = new FormData();
+            formData.append('audio', audioBlob, 'voice-message.webm');
+            
+            const token = localStorage.getItem('token');
+            const uploadResponse = await fetch(
+                `${import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:5000/api'}/upload/voice-message`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                }
+            );
+            
+            if (!uploadResponse.ok) {
+                throw new Error('Failed to upload voice message');
+            }
+            
+            const uploadData = await uploadResponse.json();
+            
+            // Send voice message
+            const newMsg = await chatAPI.sendMessage(
+                conversationId,
+                'voice',
+                uploadData.url,
+                Math.round(duration)
+            );
+            
+            const normalizedMsg = normalizeMessage(newMsg, true);
+            setMessages(prev => [...prev, normalizedMsg]);
+            scrollToBottom();
+        } catch (error) {
+            console.error('Failed to send voice message:', error);
+            alert('Failed to send voice message. Please try again.');
+        }
+    };
+
+    const handleMessageLongPress = (msg) => {
+        setSelectedMessage(msg);
+        setShowDeleteDialog(true);
+    };
+
+    const handleDeleteMessage = async (deleteType) => {
+        if (!selectedMessage) return;
+
+        try {
+            // Immediately remove from UI for better UX
+            const messageIdToDelete = selectedMessage.id;
+            setMessages(prev => prev.filter(msg => msg.id !== messageIdToDelete));
+            
+            setShowDeleteDialog(false);
+            setSelectedMessage(null);
+            
+            // Call API in background
+            await chatAPI.deleteMessage(messageIdToDelete, deleteType);
+            console.log('Message deleted successfully:', messageIdToDelete, 'deleteType:', deleteType);
+        } catch (error) {
+            console.error('Failed to delete message:', error);
+            alert('Failed to delete message. Please try again.');
+            // Reload messages on error
+            loadMessages();
+        }
+    };
+
+ const formatTime = (timestamp) => {
+    if (!timestamp) return '';
+
+    const date = new Date(timestamp); // UTC → LOCAL happens here
+
+    if (isNaN(date.getTime())) {
+        console.error('Invalid timestamp:', timestamp);
+        return '';
+    }
+
+    return date.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+    });
+};
+
+
 
     // Close menu when clicking outside
     useEffect(() => {
@@ -82,14 +397,21 @@ export default function ChatConversation() {
                         </button>
 
                         <img
-                            src={chat?.image || '/chatperson.png'}
-                            alt={chat?.name || 'User'}
+                            src={otherUser?.profilePicUrl || '/chatperson.png'}
+                            alt={otherUser?.name || 'User'}
                             className="w-10 h-10 rounded-full object-cover"
                         />
 
                         <div>
-                            <h2 className="text-white font-semibold text-lg">{chat?.name || 'Jacob Jones'}</h2>
-                            <p className="text-white/70 text-xs">Mumbai</p>
+                            <h2 className="text-white font-semibold text-lg">{otherUser?.name || 'User'}</h2>
+                            <div className="flex items-center gap-1.5">
+                                {isOnline && (
+                                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                                )}
+                                <p className="text-white/70 text-xs">
+                                    {isTyping ? 'typing...' : isOnline ? 'Online' : 'Offline'}
+                                </p>
+                            </div>
                         </div>
                     </div>
 
@@ -162,29 +484,73 @@ export default function ChatConversation() {
 
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4 scrollbar-hide">
-                {messages.map((msg) => (
-                    <div
-                        key={msg.id}
-                        className={`flex ${msg.isSent ? 'justify-end' : 'justify-start'}`}
-                    >
+                {loading ? (
+                    <div className="text-center text-white/60 py-8">Loading messages...</div>
+                ) : messages.length === 0 ? (
+                    <div className="text-center text-white/60 py-8">No messages yet. Say hi!</div>
+                ) : (
+                    messages.map((msg) => (
                         <div
-                            className={`max-w-[75%] rounded-2xl px-4 py-3 ${msg.isSent
-                                ? 'bg-white text-gray-800 rounded-br-md'
-                                : 'bg-[#3A3A3C] text-white rounded-bl-md'
-                                }`}
+                            key={msg.id}
+                            className={`flex ${msg.isSent ? 'justify-end' : 'justify-start'}`}
+                            onContextMenu={(e) => {
+                                e.preventDefault();
+                                handleMessageLongPress(msg);
+                            }}
+                            onClick={(e) => {
+                                // Long press simulation for mobile
+                                if (e.detail === 2) { // Double click
+                                    handleMessageLongPress(msg);
+                                }
+                            }}
                         >
-                            <p className="text-sm">{msg.text}</p>
-                            <div className={`flex items-center gap-1 mt-1 justify-end ${msg.isSent ? 'text-gray-500' : 'text-white/60'}`}>
-                                <span className="text-xs">{msg.time}</span>
-                                {msg.isSent && (
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                    </svg>
+                            <div
+                                className={`max-w-[75%] rounded-2xl px-4 py-3 ${msg.isSent
+                                    ? 'bg-white text-gray-800 rounded-br-md'
+                                    : 'bg-[#3A3A3C] text-white rounded-bl-md'
+                                    }`}
+                            >
+                                {msg.messageType === 'voice' || msg.type === 'VOICE' ? (
+                                    <audio 
+                                        src={msg.content} 
+                                        controls 
+                                        className="max-w-full"
+                                        style={{ 
+                                            height: '32px',
+                                            filter: msg.isSent ? 'invert(0)' : 'invert(1)'
+                                        }}
+                                    />
+                                ) : (
+                                    <p className="text-sm">{msg.content}</p>
                                 )}
+                                <div className={`flex items-center gap-1 mt-1 justify-end ${msg.isSent ? 'text-gray-500' : 'text-white/60'}`}>
+                                    <span className="text-xs">{formatTime(msg.createdAt)}</span>
+                                    {msg.isSent && (
+                                        <div className="relative flex items-center">
+                                            {msg.isRead ? (
+                                                // Two ticks for read messages
+                                                <div className="flex -space-x-1">
+                                                    <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                    <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                </div>
+                                            ) : (
+                                                // One tick for sent but not read
+                                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                ))}
+                    ))
+                )}
+                <div ref={messagesEndRef} />
             </div>
 
             {/* Input Area */}
@@ -200,7 +566,7 @@ export default function ChatConversation() {
                         <input
                             type="text"
                             value={message}
-                            onChange={(e) => setMessage(e.target.value)}
+                            onChange={handleTyping}
                             onKeyPress={handleKeyPress}
                             placeholder="Message"
                             className="flex-1 bg-transparent text-gray-800 placeholder-gray-500 outline-none text-sm"
@@ -213,7 +579,29 @@ export default function ChatConversation() {
                     </div>
 
                     {/* Send/Microphone button */}
-                    {message.trim() ? (
+                    {isRecording ? (
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={cancelRecording}
+                                className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center flex-shrink-0"
+                            >
+                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                            <div className="bg-red-500 text-white px-4 py-2 rounded-full text-sm font-medium">
+                                {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}
+                            </div>
+                            <button
+                                onClick={stopRecording}
+                                className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0"
+                            >
+                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                </svg>
+                            </button>
+                        </div>
+                    ) : message.trim() ? (
                         <button
                             onClick={handleSendMessage}
                             className="w-10 h-10 bg-white rounded-full flex items-center justify-center flex-shrink-0"
@@ -223,12 +611,57 @@ export default function ChatConversation() {
                             </svg>
                         </button>
                     ) : (
-                        <button className="w-10 h-10 bg-white rounded-full flex items-center justify-center flex-shrink-0">
+                        <button 
+                            onClick={startRecording}
+                            className="w-10 h-10 bg-white rounded-full flex items-center justify-center flex-shrink-0"
+                        >
                             <img src="/chatMic.svg" alt="Microphone" className="w-5 h-5" />
                         </button>
                     )}
                 </div>
             </div>
+
+            {/* Delete Message Dialog */}
+            {showDeleteDialog && selectedMessage && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+                    <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-800 mb-2">Delete message?</h3>
+                            <p className="text-gray-600 text-sm mb-6">
+                                {selectedMessage.isSent 
+                                    ? 'Choose who you want to delete this message for'
+                                    : 'This message will be deleted for you only'}
+                            </p>
+                            
+                            <div className="space-y-3">
+                                {selectedMessage.isSent && (
+                                    <button
+                                        onClick={() => handleDeleteMessage('for_everyone')}
+                                        className="w-full py-3 px-4 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-colors"
+                                    >
+                                        Delete for everyone
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => handleDeleteMessage('for_me')}
+                                    className="w-full py-3 px-4 bg-gray-200 text-gray-800 rounded-xl font-medium hover:bg-gray-300 transition-colors"
+                                >
+                                    Delete for me
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowDeleteDialog(false);
+                                        setSelectedMessage(null);
+                                    }}
+                                    className="w-full py-3 px-4 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

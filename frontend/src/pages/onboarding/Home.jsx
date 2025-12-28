@@ -6,6 +6,7 @@ import MessagesTab from "../tabs/MessagesTab";
 import ProfileTab from "../tabs/ProfileTab";
 import GameTab from "../tabs/GameTab";
 import { userAPI } from "../../utils/api";
+import socketService from "../../utils/socket";
 
 const navOptions = [
   { key: "matches", label: "Matches", icon: "/matches-icon.svg" },
@@ -39,18 +40,26 @@ export default function Home() {
     checkApproval();
   }, [navigate]);
 
-  // EFFECT 2: Check if another page has told us which tab to select
+  // EFFECT 2: Initialize Socket.IO connection
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token && !socketService.isConnected()) {
+      socketService.connect(token);
+    }
+
+    return () => {
+      // Don't disconnect on unmount, keep socket alive
+      // socketService.disconnect();
+    };
+  }, []);
+
+  // EFFECT 3: Check if another page has told us which tab to select
   useEffect(() => {
     // If we navigated here with a `selectedTab` in the state, update our selection
     if (location.state?.selectedTab) {
       setSelected(location.state.selectedTab);
     }
   }, [location.state]);
-
-
-  const handleBack = () => {
-    navigate(-1);
-  };
 
   // Switch statement to determine which component to show based on the selected tab
   let ContentComponent;
