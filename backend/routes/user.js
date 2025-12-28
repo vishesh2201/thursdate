@@ -243,7 +243,35 @@ router.get('/matches/potential', auth, async (req, res) => {
             return res.status(500).json({ error: 'Database connection failed' });
         }
 
-        // Get potential matches - all approved users except the current user
+        // Get current user's preferences
+        const [currentUserData] = await pool.execute(
+            'SELECT intent FROM users WHERE id = ?',
+            [req.user.userId]
+        );
+
+        if (currentUserData.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const currentUserIntent = safeJsonParse(currentUserData[0].intent, {});
+        const preferredAgeRange = currentUserIntent.preferredAgeRange || [30, 85];
+        const interestedGender = currentUserIntent.interestedGender;
+
+        // Calculate age bounds for SQL query
+        const today = new Date();
+        const maxBirthYear = today.getFullYear() - preferredAgeRange[0];
+        const minBirthYear = today.getFullYear() - preferredAgeRange[1] - 1;
+        
+        // Build WHERE clause based on gender preference
+        let genderClause = '';
+        const queryParams = [req.user.userId];
+        
+        if (interestedGender && interestedGender !== 'Everyone') {
+            genderClause = ' AND gender = ?';
+            queryParams.push(interestedGender);
+        }
+
+        // Get potential matches - filtered by age and gender preferences
         const [users] = await pool.execute(
             `SELECT id, email, first_name, last_name, gender, dob, current_location, 
                     favourite_travel_destination, profile_pic_url, intent, 
@@ -251,53 +279,64 @@ router.get('/matches/potential', auth, async (req, res) => {
                     kids_preference, food_preference, relationship_status, from_location, 
                     instagram, linkedin, face_photos
              FROM users 
-             WHERE approval = true AND id != ? AND onboarding_complete = true
+             WHERE approval = true 
+                AND id != ? 
+                AND onboarding_complete = true
+                AND dob IS NOT NULL
+                AND YEAR(dob) <= ?
+                AND YEAR(dob) >= ?
+                ${genderClause}
              ORDER BY RAND()
              LIMIT 20`,
-            [req.user.userId]
+            [...queryParams, maxBirthYear, minBirthYear, ...queryParams.slice(1)]
         );
 
-        // Parse JSON fields for each user
-        const candidates = users.map(user => {
-            // Calculate age from dob
-            let age = null;
-            if (user.dob) {
-                const birthDate = new Date(user.dob);
-                const today = new Date();
-                age = today.getFullYear() - birthDate.getFullYear();
-                const m = today.getMonth() - birthDate.getMonth();
-                if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-                    age--;
+        // Parse JSON fields and filter by exact age
+        const candidates = users
+            .map(user => {
+                // Calculate age from dob
+                let age = null;
+                if (user.dob) {
+                    const birthDate = new Date(user.dob);
+                    age = today.getFullYear() - birthDate.getFullYear();
+                    const m = today.getMonth() - birthDate.getMonth();
+                    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                        age--;
+                    }
                 }
-            }
 
-            return {
-                id: user.id,
-                email: user.email,
-                firstName: user.first_name,
-                lastName: user.last_name,
-                age: age,
-                gender: user.gender,
-                dob: user.dob,
-                currentLocation: user.current_location,
-                fromLocation: user.from_location,
-                favouriteTravelDestination: user.favourite_travel_destination,
-                profilePicUrl: user.profile_pic_url,
-                height: user.height,
-                relationshipStatus: user.relationship_status,
-                pets: user.pets,
-                drinking: user.drinking,
-                smoking: user.smoking,
-                foodPreference: user.food_preference,
-                religiousLevel: user.religious_level,
-                kidsPreference: user.kids_preference,
-                instagram: user.instagram,
-                linkedin: user.linkedin,
-                interests: safeJsonParse(user.interests, []),
-                facePhotos: safeJsonParse(user.face_photos, []),
-                intent: safeJsonParse(user.intent, {})
-            };
-        });
+                return {
+                    id: user.id,
+                    email: user.email,
+                    firstName: user.first_name,
+                    lastName: user.last_name,
+                    age: age,
+                    gender: user.gender,
+                    dob: user.dob,
+                    currentLocation: user.current_location,
+                    fromLocation: user.from_location,
+                    favouriteTravelDestination: user.favourite_travel_destination,
+                    profilePicUrl: user.profile_pic_url,
+                    height: user.height,
+                    relationshipStatus: user.relationship_status,
+                    pets: user.pets,
+                    drinking: user.drinking,
+                    smoking: user.smoking,
+                    foodPreference: user.food_preference,
+                    religiousLevel: user.religious_level,
+                    kidsPreference: user.kids_preference,
+                    instagram: user.instagram,
+                    linkedin: user.linkedin,
+                    interests: safeJsonParse(user.interests, []),
+                    facePhotos: safeJsonParse(user.face_photos, []),
+                    intent: safeJsonParse(user.intent, {})
+                };
+            })
+            .filter(user => {
+                // Final age filter to ensure exact age range match
+                if (user.age === null) return false;
+                return user.age >= preferredAgeRange[0] && user.age <= preferredAgeRange[1];
+            });
 
         res.json({ candidates });
 
