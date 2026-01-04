@@ -1,27 +1,46 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { chatAPI } from '../../utils/api';
+import { chatAPI, userAPI } from '../../utils/api';
 import socketService from '../../utils/socket';
+import { Clock } from "lucide-react";
 
 export default function MessagesTab() {
   const [activeFilter, setActiveFilter] = useState('All');
   const [conversations, setConversations] = useState([]);
+  const [mutualMatches, setMutualMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
 
+  // Get current user ID from token
+  const getCurrentUserId = () => {
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+    try {
+      return JSON.parse(atob(token.split('.')[1])).userId;
+    } catch {
+      return null;
+    }
+  };
+
   useEffect(() => {
     loadConversations();
+    loadMutualMatches();
 
     // Listen for new messages to update conversation list
     socketService.onNewMessage(({ conversationId, message }) => {
+      const currentUserId = getCurrentUserId();
+      // Calculate isSent based on current user
+      const isSent = message.senderId === currentUserId;
+      console.log('MessagesTab received new message:', { conversationId, message, currentUserId, isSent });
+      
       setConversations(prev => {
         const updated = prev.map(conv => {
           if (conv.conversationId === conversationId) {
             return {
               ...conv,
-              lastMessage: message,
-              unreadCount: message.isSent ? conv.unreadCount : conv.unreadCount + 1,
+              lastMessage: { ...message, isSent },
+              unreadCount: isSent ? conv.unreadCount : conv.unreadCount + 1,
               updatedAt: message.createdAt || message.created_at || new Date().toISOString()
 
 
@@ -34,8 +53,59 @@ export default function MessagesTab() {
       });
     });
 
+    // Listen for match moved to chat (when first message sent or replied)
+    socketService.onMatchMovedToChat(({ conversationId, otherUserId }) => {
+      console.log('Match moved to chat:', { conversationId, otherUserId });
+      // Reload matched profiles to remove the moved match
+      loadMutualMatches();
+    });
+
+    // Listen for read receipts to update message status
+    socketService.onMessagesRead(({ conversationId, messageIds }) => {
+      console.log('MessagesTab received messages_read:', { conversationId, messageIds });
+      setConversations(prev => {
+        return prev.map(conv => {
+          if (conv.conversationId === conversationId && conv.lastMessage && messageIds.includes(conv.lastMessage.id)) {
+            console.log('Updating lastMessage status to READ for conv:', conversationId, 'msg:', conv.lastMessage.id);
+            return {
+              ...conv,
+              lastMessage: {
+                ...conv.lastMessage,
+                status: 'READ',
+                isRead: true
+              }
+            };
+          }
+          return conv;
+        });
+      });
+    });
+
+    // Listen for delivery receipts to update message status
+    socketService.on('message_delivered', ({ conversationId, messageId }) => {
+      console.log('MessagesTab received message_delivered:', { conversationId, messageId });
+      setConversations(prev => {
+        return prev.map(conv => {
+          if (conv.conversationId === conversationId && conv.lastMessage && conv.lastMessage.id === messageId) {
+            console.log('Updating lastMessage status to DELIVERED for conv:', conversationId, 'msg:', messageId);
+            return {
+              ...conv,
+              lastMessage: {
+                ...conv.lastMessage,
+                status: 'DELIVERED'
+              }
+            };
+          }
+          return conv;
+        });
+      });
+    });
+
     return () => {
       socketService.off('new_message');
+      socketService.off('match_moved_to_chat');
+      socketService.off('messages_read');
+      socketService.off('message_delivered');
     };
   }, []);
 
@@ -51,8 +121,34 @@ export default function MessagesTab() {
     }
   };
 
+  const loadMutualMatches = async () => {
+    try {
+      const data = await userAPI.getMatchedProfiles();
+      setMutualMatches(data.matches || []);
+    } catch (error) {
+      console.error('Failed to load mutual matches:', error);
+    }
+  };
+
+  const calculateDaysRemaining = (expiresAt) => {
+    if (!expiresAt) return 0;
+    const expiryDate = new Date(expiresAt);
+    const now = new Date();
+    const diffTime = expiryDate - now;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return Math.max(0, diffDays); // Don't show negative days
+  };
+
   const formatTime = (timestamp) => {
+    if (!timestamp) return '';
+    
     const date = new Date(timestamp);
+    
+    // Check if date is invalid
+    if (isNaN(date.getTime())) {
+      return '';
+    }
+    
     const now = new Date();
     const diff = now - date;
     
@@ -159,8 +255,60 @@ export default function MessagesTab() {
         </div>
       </div>
 
+      {/* Matched Users Section */}
+    
+
+{mutualMatches.length > 0 && (
+  <div className="px-6 mb-6">
+    <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
+      {mutualMatches.map((match) => {
+        const daysRemaining = calculateDaysRemaining(match.expiresAt);
+
+        return (
+          <div
+            key={match.id}
+            className="flex-shrink-0 w-20 cursor-pointer active:opacity-70"
+            onClick={() => {
+              chatAPI.createConversation(match.id)
+                .then(({ conversationId }) => {
+                  navigate("/chat-conversation", {
+                    state: {
+                      conversationId,
+                      otherUser: {
+                        id: match.id,
+                        name: `${match.firstName} ${match.lastName}`,
+                        profilePicUrl: match.profilePicUrl
+                      }
+                    }
+                  });
+                })
+                .catch(err =>
+                  console.error("Failed to create conversation:", err)
+                );
+            }}
+          >
+            <div className="relative flex flex-col items-center">
+              <img
+                src={match.profilePicUrl || "/chatperson.png"}
+                alt={`${match.firstName} ${match.lastName}`}
+                className="w-14 h-14 rounded-[14px] object-cover"
+              />
+
+              <div className="absolute -bottom-2 flex items-center gap-1 bg-white text-black text-[10px] font-semibold px-2 py-[2px] rounded-full shadow">
+                <Clock size={12} strokeWidth={2} />
+                <span>{daysRemaining}d left</span>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+)}
+
+
       {/* Filter Tabs */}
-      <div className="px-6 mb-4">
+      <div className="px-6 mb-4 -mt-2">
         <div className="flex gap-3">
           {['All', 'Unread'].map((filter) => (
             <button
@@ -178,7 +326,7 @@ export default function MessagesTab() {
       </div>
 
       {/* Chat List */}
-      <div className="px-6">
+      <div className="px-6 -mt-3">
         {loading ? (
           <div className="text-center text-white/60 py-8">Loading conversations...</div>
         ) : filteredConversations.length === 0 ? (
@@ -206,15 +354,40 @@ export default function MessagesTab() {
                   <div className="flex items-center justify-between mb-1">
                     <h3 className="text-white font-semibold text-base">{conv.otherUser.name}</h3>
                     <span className="text-white/60 text-sm flex-shrink-0">
-                      {conv.lastMessage ? formatTime(conv.lastMessage.createdAt || conv.lastMessage.created_at) : ''}
-
+                      {conv.lastMessage ? formatTime(conv.lastMessage.time || conv.lastMessage.createdAt || conv.lastMessage.created_at) : ''}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
                     {conv.lastMessage?.isSent && (
-                      <svg className="w-4 h-4 text-white/60 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
+                      <>
+                        {console.log('Rendering tick for conv:', conv.conversationId, 'status:', conv.lastMessage.status, 'isRead:', conv.lastMessage.isRead)}
+                        {conv.lastMessage.status === 'READ' ? (
+                          // Double blue ticks for read messages
+                          <div className="flex -space-x-2 flex-shrink-0">
+                            <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                            <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                        ) : conv.lastMessage.status === 'DELIVERED' ? (
+                          // Double grey ticks for delivered messages
+                          <div className="flex -space-x-2 flex-shrink-0">
+                            <svg className="w-4 h-4 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                            <svg className="w-4 h-4 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                        ) : (
+                          // Single tick for sent but not delivered
+                          <svg className="w-4 h-4 text-white/60 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </>
                     )}
                     <p className="text-white/60 text-sm truncate">{getLastMessagePreview(conv)}</p>
                   </div>

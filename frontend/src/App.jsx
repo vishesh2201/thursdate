@@ -28,6 +28,7 @@ import Membership from "./pages/settings/MembershipPage";
 import DevicePermissions from "./pages/settings/DevicePermissionsPage";
 import ChatConversation from "./pages/tabs/ChatConversation";
 import GameConnection from "./pages/tabs/GameConnection";
+import UserProfileInfo from "./pages/tabs/UserProfileInfo";
 
 import "@ncdai/react-wheel-picker/style.css";
 import Verification from "./pages/onboarding/Verification";
@@ -84,6 +85,7 @@ export default function App() {
         {/* Chat Routes */}
         <Route path="/chat-conversation" element={<ChatConversation />} />
         <Route path="/game-connection" element={<GameConnection />} />
+        <Route path="/user-profile-info" element={<UserProfileInfo />} />
 
       </Routes>
     </Router>

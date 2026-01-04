@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { chatAPI } from '../../utils/api';
 import socketService from '../../utils/socket';
+import EmojiPicker from 'emoji-picker-react';
 
 export default function ChatConversation() {
     const navigate = useNavigate();
@@ -17,22 +18,27 @@ export default function ChatConversation() {
     const [recordingTime, setRecordingTime] = useState(0);
     const [selectedMessage, setSelectedMessage] = useState(null);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [recordedAudio, setRecordedAudio] = useState(null);
+    const [recordedDuration, setRecordedDuration] = useState(0);
+    const [isPlaying, setIsPlaying] = useState(false);
     const menuRef = useRef(null);
     const messagesEndRef = useRef(null);
     const typingTimeoutRef = useRef(null);
     const mediaRecorderRef = useRef(null);
     const audioChunksRef = useRef([]);
     const recordingIntervalRef = useRef(null);
+    const inputRef = useRef(null);
+    const emojiPickerRef = useRef(null);
+    const audioPreviewRef = useRef(null);
 
     // Normalize message timestamp - ensure createdAt exists
-   const normalizeMessage = (msg, isLocal = false) => {
-    return {
-        ...msg,
-        createdAt: isLocal
-            ? new Date().toISOString()   // FORCE current time for sent messages
-            : msg.createdAt || msg.created_at
+    const normalizeMessage = (msg) => {
+        return {
+            ...msg,
+            createdAt: msg.createdAt || msg.created_at || new Date().toISOString()
+        };
     };
-};
 
 
     useEffect(() => {
@@ -91,7 +97,18 @@ export default function ChatConversation() {
         socketService.onMessagesRead(({ conversationId: readConvId, messageIds }) => {
             if (readConvId === conversationId) {
                 setMessages(prev => prev.map(msg => 
-                    messageIds.includes(msg.id) ? { ...msg, isRead: true } : msg
+                    messageIds.includes(msg.id) ? { ...msg, isRead: true, status: 'READ' } : msg
+                ));
+            }
+        });
+
+        // Listen for delivery receipts
+        socketService.on('message_delivered', ({ conversationId: deliveredConvId, messageId }) => {
+            console.log('ChatConversation received message_delivered:', { deliveredConvId, messageId, currentConversationId: conversationId });
+            if (deliveredConvId === conversationId) {
+                console.log('Updating message', messageId, 'status to DELIVERED');
+                setMessages(prev => prev.map(msg => 
+                    msg.id === messageId ? { ...msg, status: 'DELIVERED' } : msg
                 ));
             }
         });
@@ -122,10 +139,16 @@ export default function ChatConversation() {
             socketService.off('new_message');
             socketService.off('user_typing');
             socketService.off('messages_read');
+            socketService.off('message_delivered');
             socketService.off('user_status');
             socketService.off('message_deleted');
+            
+            // Cleanup recorded audio if user navigates away
+            if (recordedAudio) {
+                URL.revokeObjectURL(recordedAudio.url);
+            }
         };
-    }, [conversationId, otherUser, navigate]);
+    }, [conversationId, otherUser, navigate, recordedAudio]);
 
     const loadMessages = async () => {
         try {
@@ -160,14 +183,17 @@ export default function ChatConversation() {
 
         const textToSend = message.trim();
         setMessage('');
+        setShowEmojiPicker(false);
         
         // Stop typing indicator
         socketService.stopTyping(conversationId, otherUser.id);
 
         try {
             const newMsg = await chatAPI.sendMessage(conversationId, 'text', textToSend);
+            console.log('Message sent, received response:', newMsg);
             // Normalize the sent message
-            const normalizedMsg = normalizeMessage(newMsg, true );
+            const normalizedMsg = normalizeMessage(newMsg);
+            console.log('Normalized message:', normalizedMsg);
             setMessages(prev => [...prev, normalizedMsg]);
             scrollToBottom();
         } catch (error) {
@@ -218,13 +244,14 @@ export default function ChatConversation() {
 
             mediaRecorder.onstop = async () => {
                 const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-                await sendVoiceMessage(audioBlob, recordingTime);
+                const audioUrl = URL.createObjectURL(audioBlob);
+                
+                // Save for preview instead of auto-sending
+                setRecordedAudio({ blob: audioBlob, url: audioUrl });
+                setRecordedDuration(recordingTime);
                 
                 // Stop all tracks
                 stream.getTracks().forEach(track => track.stop());
-                
-                // Reset recording state
-                setRecordingTime(0);
             };
 
             mediaRecorder.start();
@@ -271,6 +298,49 @@ export default function ChatConversation() {
         }
     };
 
+    const cancelPreview = () => {
+        if (recordedAudio) {
+            URL.revokeObjectURL(recordedAudio.url);
+        }
+        if (audioPreviewRef.current) {
+            audioPreviewRef.current.pause();
+        }
+        setRecordedAudio(null);
+        setRecordedDuration(0);
+        setRecordingTime(0);
+        setIsPlaying(false);
+    };
+
+    const togglePlayPause = () => {
+        if (!audioPreviewRef.current) return;
+        
+        if (isPlaying) {
+            audioPreviewRef.current.pause();
+            setIsPlaying(false);
+        } else {
+            audioPreviewRef.current.play();
+            setIsPlaying(true);
+        }
+    };
+
+    const sendRecordedAudio = async () => {
+        if (!recordedAudio) return;
+        
+        try {
+            if (audioPreviewRef.current) {
+                audioPreviewRef.current.pause();
+            }
+            await sendVoiceMessage(recordedAudio.blob, recordedDuration);
+            URL.revokeObjectURL(recordedAudio.url);
+            setRecordedAudio(null);
+            setRecordedDuration(0);
+            setRecordingTime(0);
+            setIsPlaying(false);
+        } catch (error) {
+            console.error('Failed to send recorded audio:', error);
+        }
+    };
+
     const sendVoiceMessage = async (audioBlob, duration) => {
         try {
             // Upload audio to backend
@@ -303,7 +373,7 @@ export default function ChatConversation() {
                 Math.round(duration)
             );
             
-            const normalizedMsg = normalizeMessage(newMsg, true);
+            const normalizedMsg = normalizeMessage(newMsg);
             setMessages(prev => [...prev, normalizedMsg]);
             scrollToBottom();
         } catch (error) {
@@ -364,16 +434,44 @@ export default function ChatConversation() {
             if (menuRef.current && !menuRef.current.contains(event.target)) {
                 setShowMenu(false);
             }
+            if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target)) {
+                setShowEmojiPicker(false);
+            }
         };
 
-        if (showMenu) {
+        if (showMenu || showEmojiPicker) {
             document.addEventListener('mousedown', handleClickOutside);
         }
 
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [showMenu]);
+    }, [showMenu, showEmojiPicker]);
+
+    const handleEmojiClick = (emojiObject) => {
+        const emoji = emojiObject.emoji;
+        const input = inputRef.current;
+        
+        if (input) {
+            const start = input.selectionStart;
+            const end = input.selectionEnd;
+            const text = message;
+            const before = text.substring(0, start);
+            const after = text.substring(end);
+            const newText = before + emoji + after;
+            
+            setMessage(newText);
+            
+            // Set cursor position after emoji
+            setTimeout(() => {
+                input.selectionStart = input.selectionEnd = start + emoji.length;
+                input.focus();
+            }, 0);
+        } else {
+            // Fallback: append to end
+            setMessage(prev => prev + emoji);
+        }
+    };
 
     return (
         <div
@@ -383,7 +481,7 @@ export default function ChatConversation() {
             }}
         >
             {/* Header */}
-            <div className="bg-white/10 backdrop-blur-md border-b border-white/20 pt-12 pb-4 px-4">
+            <div className="bg-white/10  border-b border-white/20 pt-12 pb-4 px-4">
                 <div className="flex items-center justify-between">
                     {/* Back button and profile */}
                     <div className="flex items-center gap-3 flex-1">
@@ -396,13 +494,31 @@ export default function ChatConversation() {
                             </svg>
                         </button>
 
-                        <img
-                            src={otherUser?.profilePicUrl || '/chatperson.png'}
-                            alt={otherUser?.name || 'User'}
-                            className="w-10 h-10 rounded-full object-cover"
-                        />
+                        <button
+                            onClick={() => navigate('/user-profile-info', { 
+                                state: { 
+                                    userId: otherUser?.id, 
+                                    otherUser: otherUser 
+                                } 
+                            })}
+                            className="flex-shrink-0"
+                        >
+                            <img
+                                src={otherUser?.profilePicUrl || '/chatperson.png'}
+                                alt={otherUser?.name || 'User'}
+                                className="w-10 h-10 rounded-full object-cover"
+                            />
+                        </button>
 
-                        <div>
+                        <button
+                            onClick={() => navigate('/user-profile-info', { 
+                                state: { 
+                                    userId: otherUser?.id, 
+                                    otherUser: otherUser 
+                                } 
+                            })}
+                            className="flex-1 text-left"
+                        >
                             <h2 className="text-white font-semibold text-lg">{otherUser?.name || 'User'}</h2>
                             <div className="flex items-center gap-1.5">
                                 {isOnline && (
@@ -412,7 +528,7 @@ export default function ChatConversation() {
                                     {isTyping ? 'typing...' : isOnline ? 'Online' : 'Offline'}
                                 </p>
                             </div>
-                        </div>
+                        </button>
                     </div>
 
                     {/* More options button */}
@@ -428,7 +544,7 @@ export default function ChatConversation() {
 
                         {/* Apple-style dropdown menu */}
                         {showMenu && (
-                            <div className="absolute right-0 top-12 w-56 bg-white/90 backdrop-blur-xl rounded-2xl shadow-lg overflow-hidden z-50">
+                            <div className="absolute right-0 top-12 w-56 bg-white backdrop-blur-xl rounded-2xl shadow-lg overflow-hidden z-[60]">
                                 <button
                                     onClick={() => setShowMenu(false)}
                                     className="w-full px-4 py-3 flex items-center justify-between hover:bg-black/5 transition-colors text-left"
@@ -505,11 +621,13 @@ export default function ChatConversation() {
                             }}
                         >
                             <div
-                                className={`max-w-[75%] rounded-2xl px-4 py-3 ${msg.isSent
-                                    ? 'bg-white text-gray-800 rounded-br-md'
-                                    : 'bg-[#3A3A3C] text-white rounded-bl-md'
-                                    }`}
-                            >
+  className={`max-w-[75%] rounded-2xl px-4 py-3 overflow-hidden ${
+    msg.isSent
+      ? 'bg-white text-gray-800 rounded-br-md'
+      : 'bg-[#3A3A3C] text-white rounded-bl-md'
+  }`}
+>
+
                                 {msg.messageType === 'voice' || msg.type === 'VOICE' ? (
                                     <audio 
                                         src={msg.content} 
@@ -526,10 +644,11 @@ export default function ChatConversation() {
                                 <div className={`flex items-center gap-1 mt-1 justify-end ${msg.isSent ? 'text-gray-500' : 'text-white/60'}`}>
                                     <span className="text-xs">{formatTime(msg.createdAt)}</span>
                                     {msg.isSent && (
-                                        <div className="relative flex items-center">
-                                            {msg.isRead ? (
-                                                // Two ticks for read messages
-                                                <div className="flex -space-x-1">
+                                        <div className="relative flex items-center ">
+                                            {console.log('Rendering msg', msg.id, 'status:', msg.status, 'isRead:', msg.isRead)}
+                                            {msg.status === 'READ' || msg.isRead ? (
+                                                // Double blue ticks for read messages
+                                                <div className="flex -space-x-2">
                                                     <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                                                     </svg>
@@ -537,8 +656,18 @@ export default function ChatConversation() {
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                                                     </svg>
                                                 </div>
+                                            ) : msg.status === 'DELIVERED' ? (
+                                                // Double grey ticks for delivered messages
+                                                <div className="flex -space-x-2">
+                                                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                </div>
                                             ) : (
-                                                // One tick for sent but not read
+                                                // Single tick for sent but not delivered
                                                 <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                                                 </svg>
@@ -554,76 +683,195 @@ export default function ChatConversation() {
             </div>
 
             {/* Input Area */}
-            <div className="bg-gradient-to-t from-black/60 to-transparent px-4 py-4 pb-8">
-                <div className="flex items-center gap-2">
-                    {/* Camera button */}
-                    <button className="w-10 h-10 bg-white rounded-full flex items-center justify-center flex-shrink-0">
-                        <img src="/chatCam.svg" alt="Camera" className="w-5 h-5" />
-                    </button>
-
-                    {/* Message input */}
-                    <div className="flex-1 bg-white rounded-full px-4 py-3 flex items-center">
-                        <input
-                            type="text"
-                            value={message}
-                            onChange={handleTyping}
-                            onKeyPress={handleKeyPress}
-                            placeholder="Message"
-                            className="flex-1 bg-transparent text-gray-800 placeholder-gray-500 outline-none text-sm"
+           <div className="bg-gradient-to-t from-black/60 to-transparent px-4 py-4 pb-8 z-10 relative">
+                {/* Emoji Picker */}
+                {showEmojiPicker && !isRecording && !recordedAudio && (
+                    <div ref={emojiPickerRef} className="absolute bottom-24 left-4 right-4 z-[15]">
+                        <EmojiPicker
+                            onEmojiClick={handleEmojiClick}
+                            width="100%"
+                            height="350px"
+                            theme="light"
+                            searchDisabled={false}
+                            skinTonesDisabled={false}
+                            previewConfig={{ showPreview: false }}
                         />
-                        <button className="ml-2">
-                            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                        </button>
                     </div>
-
-                    {/* Send/Microphone button */}
-                    {isRecording ? (
-                        <div className="flex items-center gap-2">
+                )}
+                
+                <div className="flex items-center gap-2">
+                    {/* Voice Preview Mode - WhatsApp style */}
+                    {recordedAudio ? (
+                        <>
+                            {/* Delete button */}
                             <button
+                                type="button"
+                                onClick={cancelPreview}
+                                className="w-11 h-11 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center flex-shrink-0 hover:bg-white/30 transition-all"
+                                title="Delete"
+                            >
+                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+
+                            {/* Audio preview bar */}
+                            <div className="flex-1 bg-white rounded-full px-4 py-2.5 flex items-center gap-3 shadow-lg">
+                                {/* Hidden audio element */}
+                                <audio 
+                                    ref={audioPreviewRef}
+                                    src={recordedAudio.url}
+                                    onEnded={() => setIsPlaying(false)}
+                                    className="hidden"
+                                />
+                                
+                                {/* Play/Pause button */}
+                                <button
+                                    type="button" 
+                                    onClick={togglePlayPause}
+                                    className="w-9 h-9 bg-[#00A884] rounded-full flex items-center justify-center flex-shrink-0 hover:bg-[#008c6f] transition-all"
+                                >
+                                    {isPlaying ? (
+                                        <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+                                        </svg>
+                                    ) : (
+                                        <svg className="w-4 h-4 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M8 5v14l11-7z"/>
+                                        </svg>
+                                    )}
+                                </button>
+
+                                {/* Waveform visualization */}
+                                <div className="flex-1 flex items-center gap-0.5 h-6">
+                                    {[...Array(30)].map((_, i) => (
+                                        <div
+                                            key={i}
+                                            className="flex-1 bg-gray-300 rounded-full"
+                                            style={{
+                                                height: `${Math.random() * 60 + 40}%`,
+                                                minWidth: '2px'
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+
+                                {/* Duration */}
+                                <span className="text-gray-600 text-sm font-medium tabular-nums">
+                                    {Math.floor(recordedDuration / 60)}:{(recordedDuration % 60).toString().padStart(2, '0')}
+                                </span>
+                            </div>
+
+                            {/* Send button */}
+                            <button
+                                type="button"
+                                onClick={sendRecordedAudio}
+                                className="w-11 h-11 bg-[#00A884] rounded-full flex items-center justify-center flex-shrink-0 hover:bg-[#008c6f] transition-all shadow-lg"
+                                title="Send"
+                            >
+                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                </svg>
+                            </button>
+                        </>
+                    ) : isRecording ? (
+                        /* Recording Mode */
+                        <>
+                            <button
+                                type="button"
                                 onClick={cancelRecording}
-                                className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center flex-shrink-0"
+                                className="w-11 h-11 bg-red-500 rounded-full flex items-center justify-center flex-shrink-0 hover:bg-red-600 transition-all shadow-lg"
                             >
                                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
-                            <div className="bg-red-500 text-white px-4 py-2 rounded-full text-sm font-medium">
-                                {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}
+                            
+                            <div className="flex-1 bg-white/20 backdrop-blur-sm rounded-full px-4 py-3 flex items-center justify-center">
+                                <div className="flex items-center gap-3">
+                                    {/* Recording indicator */}
+                                    <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                                    
+                                    {/* Timer */}
+                                    <span className="text-white font-medium tabular-nums">
+                                        {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}
+                                    </span>
+                                    
+                                    {/* Waveform animation */}
+                                    <div className="flex items-center gap-0.5 h-6">
+                                        {[...Array(15)].map((_, i) => (
+                                            <div
+                                                key={i}
+                                                className="w-0.5 bg-white/60 rounded-full animate-pulse"
+                                                style={{
+                                                    height: `${Math.random() * 60 + 40}%`,
+                                                    animationDelay: `${i * 0.1}s`
+                                                }}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
+                            
                             <button
+                                type="button"
                                 onClick={stopRecording}
-                                className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0"
+                                className="w-11 h-11 bg-[#00A884] rounded-full flex items-center justify-center flex-shrink-0 hover:bg-[#008c6f] transition-all shadow-lg"
                             >
-                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                                </svg>
+                                <div className="w-4 h-4 bg-white rounded-sm"></div>
                             </button>
-                        </div>
-                    ) : message.trim() ? (
-                        <button
-                            onClick={handleSendMessage}
-                            className="w-10 h-10 bg-white rounded-full flex items-center justify-center flex-shrink-0"
-                        >
-                            <svg className="w-5 h-5 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                            </svg>
-                        </button>
+                        </>
                     ) : (
-                        <button 
-                            onClick={startRecording}
-                            className="w-10 h-10 bg-white rounded-full flex items-center justify-center flex-shrink-0"
-                        >
-                            <img src="/chatMic.svg" alt="Microphone" className="w-5 h-5" />
-                        </button>
+                        /* Normal Mode - Text Input */
+                        <>
+                            <div className="flex-1 bg-white rounded-full px-4 py-3 flex items-center">
+                                <input
+                                    ref={inputRef}
+                                    type="text"
+                                    value={message}
+                                    onChange={handleTyping}
+                                    onKeyPress={handleKeyPress}
+                                    placeholder="Message"
+                                    className="flex-1 bg-transparent text-gray-800 placeholder-gray-500 outline-none text-sm"
+                                />
+                                <button
+                                    type="button" 
+                                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                                    className="ml-2"
+                                >
+                                    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </button>
+                            </div>
+
+                            {message.trim() ? (
+                                <button
+                                    type="button"
+                                    onClick={handleSendMessage}
+                                    className="w-10 h-10 bg-white rounded-full flex items-center justify-center flex-shrink-0"
+                                >
+                                    <svg className="w-5 h-5 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                    </svg>
+                                </button>
+                            ) : (
+                                <button
+                                    type="button" 
+                                    onClick={startRecording}
+                                    className="w-10 h-10 bg-white rounded-full flex items-center justify-center flex-shrink-0"
+                                >
+                                    <img src="/chatMic.svg" alt="Microphone" className="w-5 h-5" />
+                                </button>
+                            )}
+                        </>
                     )}
                 </div>
             </div>
 
             {/* Delete Message Dialog */}
             {showDeleteDialog && selectedMessage && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[45] px-4">
                     <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden">
                         <div className="p-6">
                             <h3 className="text-xl font-semibold text-gray-800 mb-2">Delete message?</h3>

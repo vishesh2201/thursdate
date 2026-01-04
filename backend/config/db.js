@@ -13,6 +13,8 @@ const pool = mysql.createPool({
   connectionLimit: 10,
   queueLimit: 0,
   charset: "utf8mb4",
+  timezone: '+00:00', // Store as UTC, let client convert to local time
+  dateStrings: false  // Return Date objects, not strings
 });
 
 // Test the connection on startup

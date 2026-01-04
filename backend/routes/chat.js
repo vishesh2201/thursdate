@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../config/db');
 const auth = require('../middleware/auth');
+const matchExpiryService = require('../services/matchExpiry');
 const router = express.Router();
 
 // Helper function to normalize user IDs for conversation
@@ -48,6 +49,7 @@ router.get('/conversations', auth, async (req, res) => {
         m.content as lastMessageContent,
         m.duration as lastMessageVoiceDuration,
         m.sender_id as lastMessageSenderId,
+        m.status as lastMessageStatus,
         m.created_at as lastMessageTime,
         (SELECT COUNT(*) FROM messages m2 
          WHERE m2.conversation_id = c.id 
@@ -82,6 +84,8 @@ router.get('/conversations', auth, async (req, res) => {
         content: conv.lastMessageContent,
         voiceDuration: conv.lastMessageVoiceDuration,
         senderId: conv.lastMessageSenderId,
+        status: conv.lastMessageStatus,
+        isRead: conv.lastMessageStatus === 'READ',
         time: conv.lastMessageTime,
         isSent: conv.lastMessageSenderId === userId
       } : null,
@@ -106,16 +110,10 @@ router.post('/conversations', auth, async (req, res) => {
       return res.status(400).json({ error: 'otherUserId is required' });
     }
     
-    // Check if users are mutually matched
-    const isMatched = await checkMutualMatch(userId, otherUserId);
-    if (!isMatched) {
-      return res.status(403).json({ error: 'You can only chat with matched users' });
-    }
-    
     // Normalize user IDs
     const [user1Id, user2Id] = normalizeUserIds(userId, otherUserId);
     
-    // Check if conversation already exists
+    // Check if conversation already exists (allow access to existing conversations)
     const [existing] = await pool.execute(
       'SELECT id FROM conversations WHERE user_id_1 = ? AND user_id_2 = ?',
       [user1Id, user2Id]
@@ -125,11 +123,32 @@ router.post('/conversations', auth, async (req, res) => {
       return res.json({ conversationId: existing[0].id, existed: true });
     }
     
+    // Only check for mutual match when creating a NEW conversation
+    const isMatched = await checkMutualMatch(userId, otherUserId);
+    if (!isMatched) {
+      return res.status(403).json({ error: 'You can only chat with matched users' });
+    }
+    
+    // Get match creation time from user_actions
+    const [matchInfo] = await pool.execute(
+      `SELECT GREATEST(a1.created_at, a2.created_at) as match_created_at
+       FROM user_actions a1
+       JOIN user_actions a2 ON a1.user_id = a2.target_user_id AND a1.target_user_id = a2.user_id
+       WHERE a1.user_id = ? AND a1.target_user_id = ?
+         AND a1.action_type = 'like' AND a2.action_type = 'like'`,
+      [user1Id, user2Id]
+    );
+    
+    const matchCreatedAt = matchInfo.length > 0 ? matchInfo[0].match_created_at : new Date();
+    
     // Create new conversation
     const [result] = await pool.execute(
       'INSERT INTO conversations (user_id_1, user_id_2) VALUES (?, ?)',
       [user1Id, user2Id]
     );
+    
+    // Initialize match timer (7-day expiry)
+    await matchExpiryService.initializeMatchTimer(result.insertId, matchCreatedAt);
     
     res.status(201).json({ conversationId: result.insertId, existed: false });
   } catch (error) {
@@ -180,11 +199,9 @@ router.get('/conversations/:conversationId/messages', auth, async (req, res) => 
       }
     }
     
-    params.push(finalLimit);
-    
     console.log('Final params:', params);
     
-    // Execute query
+    // Execute query - LIMIT cannot be parameterized in MySQL prepared statements
     const query = `
       SELECT 
         m.id,
@@ -201,7 +218,7 @@ router.get('/conversations/:conversationId/messages', auth, async (req, res) => 
       JOIN users u ON u.id = m.sender_id
       WHERE m.conversation_id = ?${beforeClause}
       ORDER BY m.id DESC 
-      LIMIT ?
+      LIMIT ${finalLimit}
     `;
     
     const [messages] = await pool.execute(query, params);
@@ -213,6 +230,7 @@ router.get('/conversations/:conversationId/messages', auth, async (req, res) => 
       messageType: msg.messageType.toLowerCase(),
       content: msg.content,
       voiceDuration: msg.voiceDuration,
+      status: msg.status,
       isRead: msg.status === 'READ',
       isSent: msg.senderId === userId,
       createdAt: msg.createdAt,
@@ -269,6 +287,39 @@ router.post('/conversations/:conversationId/messages', auth, async (req, res) =>
       [parseInt(conversationId)]
     );
     
+    // Track first message and replies for match expiry system
+    const isFirstMessage = await matchExpiryService.recordFirstMessage(parseInt(conversationId), userId);
+    const isReply = await matchExpiryService.recordReply(parseInt(conversationId), userId);
+    
+    console.log('[Chat] Message sent - isFirstMessage:', isFirstMessage, 'isReply:', isReply);
+    
+    // If this was the first message or a reply, emit socket event to update matched profiles
+    if (isFirstMessage || isReply) {
+      const io = req.app.get('io');
+      const conversation = convCheck[0];
+      const otherUserId = conversation.user_id_1 === userId ? conversation.user_id_2 : conversation.user_id_1;
+      
+      // Emit to sender (profile should be removed from their matched section)
+      if (isFirstMessage) {
+        io.to(`user:${userId}`).emit('match_moved_to_chat', {
+          conversationId: parseInt(conversationId),
+          otherUserId: otherUserId
+        });
+      }
+      
+      // Emit to both users when reply happens (profile should be removed from both matched sections)
+      if (isReply) {
+        io.to(`user:${userId}`).emit('match_moved_to_chat', {
+          conversationId: parseInt(conversationId),
+          otherUserId: otherUserId
+        });
+        io.to(`user:${otherUserId}`).emit('match_moved_to_chat', {
+          conversationId: parseInt(conversationId),
+          otherUserId: userId
+        });
+      }
+    }
+    
     // Get the created message with sender info
     const [messages] = await pool.execute(
       `SELECT 
@@ -293,8 +344,8 @@ router.post('/conversations/:conversationId/messages', auth, async (req, res) =>
       messageType: messages[0].messageType.toLowerCase(),
       content: messages[0].content,
       voiceDuration: messages[0].voiceDuration,
+      status: messages[0].status,
       isRead: messages[0].status === 'READ',
-      isSent: messages[0].senderId === userId,
       createdAt: messages[0].createdAt,
       sender: {
         firstName: messages[0].senderFirstName,
@@ -304,15 +355,45 @@ router.post('/conversations/:conversationId/messages', auth, async (req, res) =>
     
     // Emit socket event to the other user
     const io = req.app.get('io');
+    const socketConfig = require('../config/socket');
     const conversation = convCheck[0];
     const otherUserId = conversation.user_id_1 === userId ? conversation.user_id_2 : conversation.user_id_1;
     
+    // Check if recipient is online (from socket.js onlineUsers)
+    const onlineUsers = socketConfig.getOnlineUsers();
+    const isRecipientOnline = onlineUsers.has(otherUserId);
+    console.log(`HTTP Route - Recipient ${otherUserId} online:`, isRecipientOnline, 'Online users:', Array.from(onlineUsers.keys()));
+    
+    // If recipient is online, mark as DELIVERED
+    if (isRecipientOnline) {
+      await pool.execute(
+        'UPDATE messages SET status = ? WHERE id = ?',
+        ['DELIVERED', message.id]
+      );
+      message.status = 'DELIVERED';
+      console.log(`HTTP Route - Message ${message.id} marked as DELIVERED`);
+    }
+    
+    // Emit to recipient
     io.to(`user:${otherUserId}`).emit('new_message', {
       conversationId: parseInt(conversationId),
       message
     });
     
-    res.status(201).json(message);
+    // If recipient is online, send delivery receipt to sender
+    if (isRecipientOnline) {
+      console.log(`HTTP Route - Emitting delivery receipt to user:${userId}`);
+      io.to(`user:${userId}`).emit('message_delivered', {
+        conversationId: parseInt(conversationId),
+        messageId: message.id
+      });
+    }
+    
+    // Return message with isSent for the API caller (sender)
+    res.status(201).json({
+      ...message,
+      isSent: true
+    });
   } catch (error) {
     console.error('Send message error:', error);
     res.status(500).json({ error: 'Failed to send message' });

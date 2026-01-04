@@ -314,6 +314,16 @@ export const userAPI = {
         return authRequest('/user/matches/mutual');
     },
 
+    // Get matched profiles (for top "Matched" section - time-limited matches)
+    getMatchedProfiles: async () => {
+        if (isMockMode()) {
+            console.log("MOCK MODE: Returning empty matched profiles array");
+            return { matches: [] };
+        }
+
+        return authRequest('/user/matches/profiles');
+    },
+
     // Get users who liked you
     getLikesReceived: async () => {
         if (isMockMode()) {

@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../config/db');
 const auth = require('../middleware/auth');
+const matchExpiryService = require('../services/matchExpiry');
 const router = express.Router();
 
 // Helper function to safely parse JSON
@@ -239,6 +240,12 @@ router.put('/approve/:userId', auth, async (req, res) => {
 // Get potential matches for the current user
 router.get('/matches/potential', auth, async (req, res) => {
     try {
+        // Validate userId
+        const userId = req.user?.userId;
+        if (!userId || isNaN(parseInt(userId))) {
+            return res.status(400).json({ error: 'Invalid or missing userId' });
+        }
+
         if (!(await validateConnection())) {
             return res.status(500).json({ error: 'Database connection failed' });
         }
@@ -246,7 +253,7 @@ router.get('/matches/potential', auth, async (req, res) => {
         // Get current user's preferences
         const [currentUserData] = await pool.execute(
             'SELECT intent FROM users WHERE id = ?',
-            [req.user.userId]
+            [userId]
         );
 
         if (currentUserData.length === 0) {
@@ -257,21 +264,58 @@ router.get('/matches/potential', auth, async (req, res) => {
         const preferredAgeRange = currentUserIntent.preferredAgeRange || [30, 85];
         const interestedGender = currentUserIntent.interestedGender;
 
-        // Calculate age bounds for SQL query
-        const today = new Date();
-        const maxBirthYear = today.getFullYear() - preferredAgeRange[0];
-        const minBirthYear = today.getFullYear() - preferredAgeRange[1] - 1;
+        // Validate age range
+        const minAge = preferredAgeRange[0];
+        const maxAge = preferredAgeRange[1];
         
-        // Build WHERE clause based on gender preference
-        let genderClause = '';
-        const queryParams = [req.user.userId];
-        
-        if (interestedGender && interestedGender !== 'Everyone') {
-            genderClause = ' AND gender = ?';
-            queryParams.push(interestedGender);
+        if (minAge === undefined || minAge === null || isNaN(minAge)) {
+            return res.status(400).json({ error: 'Invalid minAge value' });
+        }
+        if (maxAge === undefined || maxAge === null || isNaN(maxAge)) {
+            return res.status(400).json({ error: 'Invalid maxAge value' });
         }
 
-        // Get potential matches - filtered by age and gender preferences
+        // Normalize gender preference - handle all possible values
+        let normalizedGender = 'both';
+        if (interestedGender) {
+            const rawGender = String(interestedGender).toLowerCase().trim();
+            const genderMap = {
+                'male': 'male', 'men': 'male', 'm': 'male',
+                'female': 'female', 'women': 'female', 'woman': 'female', 'f': 'female',
+                'both': 'both', 'everyone': 'both', 'all': 'both', 'any': 'both', 'anyone': 'both'
+            };
+            normalizedGender = genderMap[rawGender] || 'both';
+        }
+
+        // Calculate DOB range in Node.js to avoid YEAR(dob) malformed packet error
+        const today = new Date();
+        const currentYear = today.getFullYear();
+        const currentMonth = today.getMonth();
+        const currentDay = today.getDate();
+        
+        // minDob = oldest allowed birth date (today - maxAge years)
+        const minDob = new Date(currentYear - maxAge - 1, currentMonth, currentDay);
+        // maxDob = youngest allowed birth date (today - minAge years)
+        const maxDob = new Date(currentYear - minAge, currentMonth, currentDay);
+        
+        // Format dates for MySQL YYYY-MM-DD
+        const minDobStr = minDob.toISOString().split('T')[0];
+        const maxDobStr = maxDob.toISOString().split('T')[0];
+
+        console.log('[DEBUG] Match filter:', { userId, minAge, maxAge, normalizedGender, minDob: minDobStr, maxDob: maxDobStr });
+        
+        // Build WHERE clause for gender
+        let genderClause = '';
+        const queryParams = [userId, minDobStr, maxDobStr];
+        
+        if (normalizedGender !== 'both') {
+            // Capitalize for DB: male -> Male, female -> Female
+            const dbGender = normalizedGender.charAt(0).toUpperCase() + normalizedGender.slice(1);
+            genderClause = ' AND gender = ?';
+            queryParams.push(dbGender);
+        }
+
+        // Get potential matches using dob BETWEEN (no YEAR function, no ORDER BY RAND)
         const [users] = await pool.execute(
             `SELECT id, email, first_name, last_name, gender, dob, current_location, 
                     favourite_travel_destination, profile_pic_url, intent, 
@@ -283,24 +327,22 @@ router.get('/matches/potential', auth, async (req, res) => {
                 AND id != ? 
                 AND onboarding_complete = true
                 AND dob IS NOT NULL
-                AND YEAR(dob) <= ?
-                AND YEAR(dob) >= ?
+                AND CAST(dob AS CHAR) != '0000-00-00'
+                AND dob BETWEEN ? AND ?
                 ${genderClause}
-             ORDER BY RAND()
              LIMIT 20`,
-            [...queryParams, maxBirthYear, minBirthYear, ...queryParams.slice(1)]
+            queryParams
         );
 
-        // Parse JSON fields and filter by exact age
+        // Parse JSON fields and calculate exact age
         const candidates = users
             .map(user => {
-                // Calculate age from dob
                 let age = null;
                 if (user.dob) {
                     const birthDate = new Date(user.dob);
-                    age = today.getFullYear() - birthDate.getFullYear();
-                    const m = today.getMonth() - birthDate.getMonth();
-                    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                    age = currentYear - birthDate.getFullYear();
+                    const m = currentMonth - birthDate.getMonth();
+                    if (m < 0 || (m === 0 && currentDay < birthDate.getDate())) {
                         age--;
                     }
                 }
@@ -333,16 +375,15 @@ router.get('/matches/potential', auth, async (req, res) => {
                 };
             })
             .filter(user => {
-                // Final age filter to ensure exact age range match
                 if (user.age === null) return false;
-                return user.age >= preferredAgeRange[0] && user.age <= preferredAgeRange[1];
+                return user.age >= minAge && user.age <= maxAge;
             });
 
         res.json({ candidates });
 
     } catch (error) {
         console.error('Get matches error:', error);
-        res.status(500).json({ error: 'Internal server error: ' + error.message });
+        res.status(500).json({ error: 'Failed to fetch potential matches. Please try again later.' });
     }
 });
 
@@ -549,6 +590,28 @@ router.get('/matches/likes-received', auth, async (req, res) => {
 
     } catch (error) {
         console.error('Get likes received error:', error);
+        res.status(500).json({ error: 'Internal server error: ' + error.message });
+    }
+});
+
+// Get matched profiles (for the top "Matched" section)
+// This returns only matches that should appear in the matched profiles section
+// (excluding active chats that have moved to the chat list)
+router.get('/matches/profiles', auth, async (req, res) => {
+    try {
+        if (!(await validateConnection())) {
+            return res.status(500).json({ error: 'Database connection failed' });
+        }
+
+        const userId = req.user.userId;
+        
+        // Get matched profiles using the match expiry service
+        const profiles = await matchExpiryService.getMatchedProfilesForUser(userId);
+        
+        res.json({ matches: profiles });
+
+    } catch (error) {
+        console.error('Get matched profiles error:', error);
         res.status(500).json({ error: 'Internal server error: ' + error.message });
     }
 });

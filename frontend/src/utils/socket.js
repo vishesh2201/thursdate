@@ -166,6 +166,17 @@ class SocketService {
   }
 
   /**
+   * Listen for match moved to chat event (when first message sent or replied)
+   * @param {Function} callback - Callback function to handle match moved event
+   */
+  onMatchMovedToChat(callback) {
+    if (this.socket) {
+      this.socket.on('match_moved_to_chat', callback);
+      this.listeners.set('match_moved_to_chat', callback);
+    }
+  }
+
+  /**
    * Remove a specific event listener
    * @param {string} event - Event name
    */
