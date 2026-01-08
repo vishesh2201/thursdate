@@ -18,6 +18,7 @@ export default function HomeTab() {
   const [scrollTop, setScrollTop] = useState(0);
   const [touchStart, setTouchStart] = useState(0);
   const [viewMode, setViewMode] = useState("lifestyle"); // "lifestyle" or "personal"
+  const [currentLifestyleImageIndex, setCurrentLifestyleImageIndex] = useState(0);
 
   // Candidates state
   const [candidates, setCandidates] = useState([]);
@@ -55,6 +56,7 @@ export default function HomeTab() {
           relationshipStatus: user.relationshipStatus,
           bio: user.intent?.bio || '',
           lifestyleImages: user.intent?.lifestyleImageUrls || [],
+          personalImages: user.facePhotos || [],
           interests: user.interests || [],
           entertainment: {
             movies: user.intent?.movies || [],
@@ -78,6 +80,16 @@ export default function HomeTab() {
 
   const currentCandidate = candidates[currentCandidateIndex];
 
+  // Reset lifestyle image index when candidate changes
+  useEffect(() => {
+    setCurrentLifestyleImageIndex(0);
+  }, [currentCandidateIndex]);
+
+  // Reset image index when view mode changes
+  useEffect(() => {
+    setCurrentLifestyleImageIndex(0);
+  }, [viewMode]);
+
   const handleScroll = (e) => {
     const scrollPosition = e.target.scrollTop;
     setScrollTop(scrollPosition);
@@ -93,21 +105,25 @@ export default function HomeTab() {
   };
 
   const handleTouchMove = (e) => {
+    // Handle vertical swipes for minimize/expand
     const touchCurrent = e.touches[0].clientY;
-    const diff = touchCurrent - touchStart;
+    const verticalDiff = touchCurrent - touchStart;
 
     if (isMinimized) {
       // If minimized and swiping up (negative diff), expand card
-      if (diff < -10) {
+      if (verticalDiff < -10) {
         setIsMinimized(false);
       }
-    } else if (scrollTop === 0) {
-      // If at top and swiping down (positive diff), minimize card
-      if (diff > 0) {
-        setIsMinimized(true);
-      }
+      return;
+    }
+
+    // If at top and swiping down (positive diff), minimize card
+    if (scrollTop === 0 && verticalDiff > 0) {
+      setIsMinimized(true);
     }
   };
+
+
 
   // Button dragging handlers
   const handleButtonMouseDown = (e) => {
@@ -217,13 +233,31 @@ export default function HomeTab() {
     }
   };
 
+  const handleBackgroundTap = () => {
+    // Only cycle images when card is minimized
+    if (!isMinimized) return;
+    if (!currentCandidate) return;
+
+    // Get current images based on view mode
+    const currentImages = viewMode === "lifestyle"
+      ? currentCandidate.lifestyleImages
+      : currentCandidate.personalImages;
+
+    if (!currentImages || currentImages.length === 0) return;
+
+    // Cycle to next image
+    setCurrentLifestyleImageIndex((prev) =>
+      (prev + 1) % currentImages.length
+    );
+  };
+
   const handleGoToChat = async () => {
     if (!matchedUser) return;
-    
+
     try {
       // Create or get conversation with matched user
       const { conversationId } = await chatAPI.createConversation(matchedUser.userId);
-      
+
       // Navigate to chat conversation
       navigate('/chat-conversation', {
         state: {
@@ -252,12 +286,23 @@ export default function HomeTab() {
       onTouchEnd={handleButtonMouseUp}
     >
       <div
-        className="flex-1 pb-28 overflow-hidden"
+        className="flex-1 pb-28 overflow-hidden relative"
+        onClick={handleBackgroundTap}
         style={{
-          backgroundImage: 'url(/bgs/matchesbg.jpg)',
+          backgroundImage: (() => {
+            if (!currentCandidate) return 'url(/bgs/matchesbg.jpg)';
+            const currentImages = viewMode === "lifestyle"
+              ? currentCandidate.lifestyleImages
+              : currentCandidate.personalImages;
+            return currentImages && currentImages.length > 0
+              ? `url(${currentImages[currentLifestyleImageIndex]})`
+              : 'url(/bgs/matchesbg.jpg)';
+          })(),
           backgroundSize: 'cover',
           backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat'
+          backgroundRepeat: 'no-repeat',
+          transition: 'background-image 0.3s ease-in-out',
+          cursor: 'pointer'
         }}
       >
         {loading ? (
@@ -283,6 +328,27 @@ export default function HomeTab() {
           </div>
         ) : (
           <>
+            {/* Lifestyle/Personal Image Indicators */}
+            {(() => {
+              const currentImages = viewMode === "lifestyle"
+                ? currentCandidate.lifestyleImages
+                : currentCandidate.personalImages;
+              return currentImages && currentImages.length > 1 && (
+                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex gap-2 z-10">
+                  {currentImages.map((_, idx) => (
+                    <div
+                      key={idx}
+                      className="h-1 rounded-full transition-all"
+                      style={{
+                        width: idx === currentLifestyleImageIndex ? '24px' : '8px',
+                        backgroundColor: idx === currentLifestyleImageIndex ? 'white' : 'rgba(255, 255, 255, 0.5)'
+                      }}
+                    />
+                  ))}
+                </div>
+              );
+            })()}
+
             {/* Top Bar */}
             <div className="flex items-center justify-between px-6 pt-10 pb-4">
               <div style={{ width: 40 }}></div>
@@ -363,17 +429,22 @@ export default function HomeTab() {
             {/* Scrollable Profile Card */}
             <div className="px-4 h-[calc(100vh-120px)]">
               <div
-                className={`rounded-t-3xl p-5 pb-32 shadow-lg h-full transition-transform duration-300 ${isMinimized ? 'overflow-hidden' : 'overflow-y-auto'}`}
+                className={`rounded-t-3xl p-5 pb-32 shadow-lg h-full transition-all duration-300 ${isMinimized ? 'overflow-hidden' : 'overflow-y-auto'}`}
                 style={{
                   background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.6) 100%)',
                   boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
-                  transform: isMinimized ? 'translateY(calc(100vh - 280px))' : 'translateY(0)',
+                  transform: isMinimized
+                    ? 'translateY(calc(100vh - 280px))'
+                    : 'translateY(0)',
+                  transition: 'all 0.3s ease-out',
+                  position: 'relative',
                 }}
                 onScroll={handleScroll}
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onClick={() => isMinimized && setIsMinimized(false)}
               >
+
 
                 {/* Profile Header */}
                 <div className="flex items-start gap-4 mb-6">
@@ -437,22 +508,6 @@ export default function HomeTab() {
                     </span>
                   </div>
                 </div>
-
-                {/* Lifestyle Pictures */}
-                {currentCandidate.lifestyleImages && currentCandidate.lifestyleImages.length > 0 && (
-                  <div className="mb-6">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-white text-base font-semibold">Lifestyle</h3>
-                    </div>
-                    <div className="grid grid-cols-3 gap-3">
-                      {currentCandidate.lifestyleImages.map((img, idx) => (
-                        <div key={idx} className="aspect-square rounded-xl overflow-hidden bg-white/10">
-                          <img src={img} alt={`Lifestyle ${idx + 1}`} className="w-full h-full object-cover" />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 {/* Bio */}
                 {currentCandidate.bio && (
