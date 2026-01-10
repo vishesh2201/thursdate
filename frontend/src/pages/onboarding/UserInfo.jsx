@@ -55,9 +55,9 @@ export default function UserInfo() {
   const [currentFavouritePlaceToGoInput, setCurrentFavouritePlaceToGoInput] = useState("");
   const [favouritePlaceSuggestions, setFavouritePlaceSuggestions] = useState([]);
 
-  // Profile picture step state
-  const [profilePic, setProfilePic] = useState(null);
-  const [profilePicUrl, setProfilePicUrl] = useState("");
+  // Face verification reference photo step state
+  const [faceVerificationPic, setFaceVerificationPic] = useState(null);
+  const [faceVerificationUrl, setFaceVerificationUrl] = useState("");
   const [showPicModal, setShowPicModal] = useState(false);
   const [uploadingPic, setUploadingPic] = useState(false);
   const [picError, setPicError] = useState("");
@@ -87,7 +87,7 @@ export default function UserInfo() {
         if (userData.favouriteTravelDestination) setFavouriteTravelDestination(userData.favouriteTravelDestination);
         if (userData.lastHolidayPlaces) setLastHolidayPlaces(userData.lastHolidayPlaces);
         if (userData.favouritePlacesToGo) setFavouritePlacesToGo(userData.favouritePlacesToGo);
-        if (userData.profilePicUrl) setProfilePicUrl(userData.profilePicUrl);
+        if (userData.faceVerificationUrl) setFaceVerificationUrl(userData.faceVerificationUrl);
       } catch (err) {
         console.error('Failed to load profile', err);
       }
@@ -144,8 +144,8 @@ export default function UserInfo() {
   const progress = (step / totalSteps) * 100;
 
   const handleNext = async () => {
-    if (step === 8 && profilePicUrl) {
-      // Save user info to backend (including profilePicUrl)
+    if (step === 8 && faceVerificationUrl) {
+      // Save user info to backend (including faceVerificationUrl for verification)
       try {
         await userAPI.saveProfile({
           firstName,
@@ -156,7 +156,7 @@ export default function UserInfo() {
           favouriteTravelDestination,
           lastHolidayPlaces,
           favouritePlacesToGo,
-          profilePicUrl,
+          faceVerificationUrl, // Stored for later face matching verification
         });
         navigate('/social-presence');
       } catch (err) {
@@ -279,7 +279,7 @@ export default function UserInfo() {
   const isStepFiveValid = favouriteTravelDestination.trim();
   const isStepSixValid = lastHolidayPlaces.length >= 3;
   const isStepSevenValid = favouritePlacesToGo.length >= 3;
-  const isStepEightValid = !!profilePicUrl;
+  const isStepEightValid = !!faceVerificationUrl;
 
   const getNextButtonDisabled = () => {
     switch (step) {
@@ -299,16 +299,16 @@ export default function UserInfo() {
     return step === totalSteps ? "Finish" : "Next";
   };
 
-  // Profile picture upload handlers
+  // Face verification photo upload handler
   const handlePicInput = async (e) => {
     setPicError("");
     const file = e.target.files[0];
     if (!file) return;
-    setProfilePic(file);
+    setFaceVerificationPic(file);
     setUploadingPic(true);
     try {
-      const result = await uploadAPI.uploadProfilePicture(file);
-      setProfilePicUrl(result.url);
+      const result = await uploadAPI.uploadFacePhoto(file);
+      setFaceVerificationUrl(result.url);
     } catch (err) {
       setPicError("Failed to upload image. Please try again.");
     } finally {
@@ -640,187 +640,185 @@ export default function UserInfo() {
           )}
 
           {/* Step 6: Last Holiday Places - Tag Input with Autocomplete */}
-         {step === 6 && (
-  <div className="flex flex-col flex-grow">
-    <h1 className="text-xl font-semibold mb-4 text-white drop-shadow-md">Where did you go on your last holiday?</h1>
-    <p className={`text-sm mb-6 ${isStepSixValid ? 'text-white/70' : 'text-red-300'}`}>
-      {isStepSixValid ? 'Great! You can add more if you like.' : 'Enter minimum 3 places'}
-    </p>
+          {step === 6 && (
+            <div className="flex flex-col flex-grow">
+              <h1 className="text-xl font-semibold mb-4 text-white drop-shadow-md">Where did you go on your last holiday?</h1>
+              <p className={`text-sm mb-6 ${isStepSixValid ? 'text-white/70' : 'text-red-300'}`}>
+                {isStepSixValid ? 'Great! You can add more if you like.' : 'Enter minimum 3 places'}
+              </p>
 
-    {/* Input for new tags with autocomplete - MOVED TO TOP */}
-    <div className="relative mb-4">
-      <input
-        type="text"
-        value={currentLastHolidayPlaceInput}
-        onChange={(e) => setCurrentLastHolidayPlaceInput(e.target.value)}
-        onKeyDown={handleAddLastHolidayPlace}
-        placeholder="Type a place & press Enter (e.g., Paris)"
-        className={`w-full px-4 py-3 border rounded-xl text-sm pr-10 ${INPUT_GLASS}`}
-      />
-      {currentLastHolidayPlaceInput && (
-        <button
-          onClick={() => {
-            setCurrentLastHolidayPlaceInput("");
-            setLastHolidaySuggestions([]);
-          }}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 text-lg transition"
-        >
-          ×
-        </button>
-      )}
-      {lastHolidaySuggestions.length > 0 && (
-        <ul className="absolute z-20 w-full bg-white/40 backdrop-blur-lg border border-white/40 rounded-xl mt-1 max-h-40 overflow-y-auto shadow-xl">
-          {lastHolidaySuggestions.map((suggestion, index) => (
-            <li
-              key={index}
-              onClick={() => handleLastHolidaySuggestionClick(suggestion)}
-              className="px-4 py-2 text-sm text-white hover:bg-white/20 cursor-pointer transition"
-            >
-              {suggestion}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+              {/* Input for new tags with autocomplete - MOVED TO TOP */}
+              <div className="relative mb-4">
+                <input
+                  type="text"
+                  value={currentLastHolidayPlaceInput}
+                  onChange={(e) => setCurrentLastHolidayPlaceInput(e.target.value)}
+                  onKeyDown={handleAddLastHolidayPlace}
+                  placeholder="Type a place & press Enter (e.g., Paris)"
+                  className={`w-full px-4 py-3 border rounded-xl text-sm pr-10 ${INPUT_GLASS}`}
+                />
+                {currentLastHolidayPlaceInput && (
+                  <button
+                    onClick={() => {
+                      setCurrentLastHolidayPlaceInput("");
+                      setLastHolidaySuggestions([]);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 text-lg transition"
+                  >
+                    ×
+                  </button>
+                )}
+                {lastHolidaySuggestions.length > 0 && (
+                  <ul className="absolute z-20 w-full bg-white/40 backdrop-blur-lg border border-white/40 rounded-xl mt-1 max-h-40 overflow-y-auto shadow-xl">
+                    {lastHolidaySuggestions.map((suggestion, index) => (
+                      <li
+                        key={index}
+                        onClick={() => handleLastHolidaySuggestionClick(suggestion)}
+                        className="px-4 py-2 text-sm text-white hover:bg-white/20 cursor-pointer transition"
+                      >
+                        {suggestion}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
 
-    {/* Display existing tags - MOVED BELOW INPUT */}
-    <div className="flex flex-wrap gap-4 mb-auto max-h-40 overflow-y-auto">
-      {lastHolidayPlaces.map((place) => (
-        <div
-          key={place.id}
-          className="px-3 py-2 rounded-full flex items-center justify-between text-sm shadow-md"
-          style={{
-            width: 'full',
-            borderRadius: '50px',
-            background: 'rgba(0, 0, 0, 0.50)',
-            border: '1px solid rgba(255, 255, 255, 0.40)',
-          }}
-        >
-          <div className="flex-1 min-w-0 overflow-hidden">
-            <span className="text-white truncate block">{place.name}</span>
-            {place.details && (
-              <span className="text-white/80 text-xs truncate block">({place.details})</span>
-            )}
-          </div>
-          <button
-            onClick={() => handleRemoveLastHolidayPlace(place.id)}
-            className="ml-2 text-white/80 hover:text-white transition flex-shrink-0"
-          >
-            ×
-          </button>
-        </div>
-      ))}
-    </div>
+              {/* Display existing tags - MOVED BELOW INPUT */}
+              <div className="flex flex-wrap gap-4 mb-auto max-h-40 overflow-y-auto">
+                {lastHolidayPlaces.map((place) => (
+                  <div
+                    key={place.id}
+                    className="px-3 py-2 rounded-full flex items-center justify-between text-sm shadow-md"
+                    style={{
+                      width: 'full',
+                      borderRadius: '50px',
+                      background: 'rgba(0, 0, 0, 0.50)',
+                      border: '1px solid rgba(255, 255, 255, 0.40)',
+                    }}
+                  >
+                    <div className="flex-1 min-w-0 overflow-hidden">
+                      <span className="text-white truncate block">{place.name}</span>
+                      {place.details && (
+                        <span className="text-white/80 text-xs truncate block">({place.details})</span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => handleRemoveLastHolidayPlace(place.id)}
+                      className="ml-2 text-white/80 hover:text-white transition flex-shrink-0"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
 
-    <button
-      disabled={getNextButtonDisabled()}
-      onClick={handleNext}
-      className={`w-full py-4 rounded-[9999px] font-medium text-lg transition mt-6 ${
-        getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
-      }`}
-    >
-      {getNextButtonText()}
-    </button>
-  </div>
-)}
+              <button
+                disabled={getNextButtonDisabled()}
+                onClick={handleNext}
+                className={`w-full py-4 rounded-[9999px] font-medium text-lg transition mt-6 ${getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
+                  }`}
+              >
+                {getNextButtonText()}
+              </button>
+            </div>
+          )}
 
           {/* Step 7: Favourite Places to Go To - Tag Input with Autocomplete */}
-         {step === 7 && (
-  <div className="flex flex-col flex-grow">
-    <h1 className="text-xl font-semibold mb-4 text-white drop-shadow-md">What are your three favourite places to go to?</h1>
-    <p className={`text-sm mb-6 ${isStepSevenValid ? 'text-white/70' : 'text-red-300'}`}>
-      {isStepSevenValid ? 'Perfect! Time for the final step.' : 'Enter minimum 3 places'}
-    </p>
+          {step === 7 && (
+            <div className="flex flex-col flex-grow">
+              <h1 className="text-xl font-semibold mb-4 text-white drop-shadow-md">What are your three favourite places to go to?</h1>
+              <p className={`text-sm mb-6 ${isStepSevenValid ? 'text-white/70' : 'text-red-300'}`}>
+                {isStepSevenValid ? 'Perfect! Time for the final step.' : 'Enter minimum 3 places'}
+              </p>
 
-    {/* Input for new tags with autocomplete - MOVED TO TOP */}
-    <div className="relative mb-4">
-      <input
-        type="text"
-        value={currentFavouritePlaceToGoInput}
-        onChange={(e) => setCurrentFavouritePlaceToGoInput(e.target.value)}
-        onKeyDown={handleAddFavouritePlaceToGo}
-        placeholder="Type a place & press Enter (e.g., Paris)"
-        className={`w-full px-4 py-3 border rounded-xl text-sm pr-10 ${INPUT_GLASS}`}
-      />
-      {currentFavouritePlaceToGoInput && (
-        <button
-          onClick={() => {
-            setCurrentFavouritePlaceToGoInput("");
-            setFavouritePlaceSuggestions([]);
-          }}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 text-lg transition"
-        >
-          ×
-        </button>
-      )}
-      {favouritePlaceSuggestions.length > 0 && (
-        <ul className="absolute z-20 w-full bg-white/40 backdrop-blur-lg border border-white/40 rounded-xl mt-1 max-h-40 overflow-y-auto shadow-xl">
-          {favouritePlaceSuggestions.map((suggestion, index) => (
-            <li
-              key={index}
-              onClick={() => handleFavouritePlaceSuggestionClick(suggestion)}
-              className="px-4 py-2 text-sm text-white hover:bg-white/20 cursor-pointer transition"
-            >
-              {suggestion}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+              {/* Input for new tags with autocomplete - MOVED TO TOP */}
+              <div className="relative mb-4">
+                <input
+                  type="text"
+                  value={currentFavouritePlaceToGoInput}
+                  onChange={(e) => setCurrentFavouritePlaceToGoInput(e.target.value)}
+                  onKeyDown={handleAddFavouritePlaceToGo}
+                  placeholder="Type a place & press Enter (e.g., Paris)"
+                  className={`w-full px-4 py-3 border rounded-xl text-sm pr-10 ${INPUT_GLASS}`}
+                />
+                {currentFavouritePlaceToGoInput && (
+                  <button
+                    onClick={() => {
+                      setCurrentFavouritePlaceToGoInput("");
+                      setFavouritePlaceSuggestions([]);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 text-lg transition"
+                  >
+                    ×
+                  </button>
+                )}
+                {favouritePlaceSuggestions.length > 0 && (
+                  <ul className="absolute z-20 w-full bg-white/40 backdrop-blur-lg border border-white/40 rounded-xl mt-1 max-h-40 overflow-y-auto shadow-xl">
+                    {favouritePlaceSuggestions.map((suggestion, index) => (
+                      <li
+                        key={index}
+                        onClick={() => handleFavouritePlaceSuggestionClick(suggestion)}
+                        className="px-4 py-2 text-sm text-white hover:bg-white/20 cursor-pointer transition"
+                      >
+                        {suggestion}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
 
-    {/* Display existing tags - MOVED BELOW INPUT */}
-    <div className="flex flex-wrap gap-2 mb-auto max-h-40 overflow-y-auto">
-      {favouritePlacesToGo.map((place) => (
-        <div
-          key={place.id}
-          className="px-4 py-2 rounded-full flex items-center text-sm shadow-md"
-          style={{
-            borderRadius: '50px',
-            background: 'rgba(0, 0, 0, 0.50)',
-            border: '1px solid rgba(255, 255, 255, 0.40)',
-            flex: '0 0 calc(50% - 0.25rem)', // Makes 2 per row with gap
-            minWidth: '150', // Prevents overflow
-          }}
-        >
-          <span className="text-white truncate">{place.name}</span>
-          {place.details && (
-            <span className="text-white/80 ml-1 text-xs truncate">({place.details})</span>
+              {/* Display existing tags - MOVED BELOW INPUT */}
+              <div className="flex flex-wrap gap-2 mb-auto max-h-40 overflow-y-auto">
+                {favouritePlacesToGo.map((place) => (
+                  <div
+                    key={place.id}
+                    className="px-4 py-2 rounded-full flex items-center text-sm shadow-md"
+                    style={{
+                      borderRadius: '50px',
+                      background: 'rgba(0, 0, 0, 0.50)',
+                      border: '1px solid rgba(255, 255, 255, 0.40)',
+                      flex: '0 0 calc(50% - 0.25rem)', // Makes 2 per row with gap
+                      minWidth: '150', // Prevents overflow
+                    }}
+                  >
+                    <span className="text-white truncate">{place.name}</span>
+                    {place.details && (
+                      <span className="text-white/80 ml-1 text-xs truncate">({place.details})</span>
+                    )}
+                    <button
+                      onClick={() => handleRemoveFavouritePlaceToGo(place.id)}
+                      className="ml-2 text-white/80 hover:text-white transition flex-shrink-0"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                disabled={getNextButtonDisabled()}
+                onClick={handleNext}
+                className={`w-full py-4 rounded-[9999px] font-medium text-lg transition mt-6 ${getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
+                  }`}
+              >
+                {getNextButtonText()}
+              </button>
+            </div>
           )}
-          <button
-            onClick={() => handleRemoveFavouritePlaceToGo(place.id)}
-            className="ml-2 text-white/80 hover:text-white transition flex-shrink-0"
-          >
-            ×
-          </button>
-        </div>
-      ))}
-    </div>
 
-    <button
-      disabled={getNextButtonDisabled()}
-      onClick={handleNext}
-      className={`w-full py-4 rounded-[9999px] font-medium text-lg transition mt-6 ${
-        getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
-      }`}
-    >
-      {getNextButtonText()}
-    </button>
-  </div>
-)}
-
-          {/* Step 8: Profile Picture Upload */}
+          {/* Step 8: Face Verification Reference Photo */}
           {step === 8 && (
             <div className="flex flex-col flex-grow items-center">
-              <h1 className="text-xl font-semibold mb-2 text-white drop-shadow-md">Face Verification</h1>
-              <p className="text-sm text-white/70 mb-6 text-center">Upload a clear face photo.<br />This won’t appear on your profile—it’s just to keep our community safe.</p>
+              <h1 className="text-xl font-semibold mb-2 text-white drop-shadow-md">Face Verification - Step 1</h1>
+              <p className="text-sm text-white/70 mb-6 text-center">Upload a clear photo of your face for verification.</p>
 
               <div className="flex flex-col items-center mb-auto">
                 <div
                   className="w-36 h-36 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center overflow-hidden mb-4 border-4 border-white/50 relative cursor-pointer shadow-xl transition"
                   onClick={() => setShowPicModal(true)}
                 >
-                  {profilePicUrl ? (
-                    <img src={profilePicUrl} alt="Profile Preview" className="object-cover w-full h-full" />
+                  {faceVerificationUrl ? (
+                    <img src={faceVerificationUrl} alt="Face Verification Preview" className="object-cover w-full h-full" />
                   ) : (
                     <span className="text-6xl text-white/70">+</span>
                   )}
@@ -832,11 +830,12 @@ export default function UserInfo() {
                 </div>
 
                 <div className="text-xs text-white/60 text-center">
-                  <div className="mb-2 font-semibold text-white/80">Pro Tip:</div>
+                  <div className="mb-2 font-semibold text-white/80">Important Guidelines:</div>
                   <ul className="list-disc list-inside text-xs text-white/70 text-left w-max mx-auto">
-                    <li>Use a well-lit background</li>
-                    <li>Look straight at the camera</li>
-                    <li>No sunglasses or masks</li>
+                    <li>Face clearly visible and well-lit</li>
+                    <li>Look directly at the camera</li>
+                    <li>No sunglasses, hats, or face coverings</li>
+                    <li>This photo is for security verification only</li>
                   </ul>
                 </div>
                 {picError && <div className="text-red-300 text-xs mt-2">{picError}</div>}
@@ -854,7 +853,7 @@ export default function UserInfo() {
               {showPicModal && (
                 <div className="fixed inset-0 bg-black/60 flex items-end justify-center z-50">
                   <div className={`w-full p-6 pb-8 shadow-2xl rounded-t-3xl bg-black/30 backdrop-blur-xl border-t border-white/20`}>
-                    <div className="mb-4 text-center font-semibold text-white">Upload a profile picture</div>
+                    <div className="mb-4 text-center font-semibold text-white">Upload verification photo</div>
                     <div className="flex flex-col gap-3">
                       {/* Gallery Button - Styled for Glassmorphism */}
                       <label className="w-full py-3 rounded-xl bg-white/20 backdrop-blur-sm text-center cursor-pointer text-sm font-medium text-white/90 border border-white/30 hover:bg-white/30 transition">
