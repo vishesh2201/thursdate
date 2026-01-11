@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { chatAPI } from '../../utils/api';
 import socketService from '../../utils/socket';
-import EmojiPicker from 'emoji-picker-react';
 
 export default function ChatConversation() {
     const navigate = useNavigate();
@@ -18,10 +17,12 @@ export default function ChatConversation() {
     const [recordingTime, setRecordingTime] = useState(0);
     const [selectedMessage, setSelectedMessage] = useState(null);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [recordedAudio, setRecordedAudio] = useState(null);
     const [recordedDuration, setRecordedDuration] = useState(0);
     const [isPlaying, setIsPlaying] = useState(false);
+    const [showClearChatDialog, setShowClearChatDialog] = useState(false);
+    const [showUnmatchDialog, setShowUnmatchDialog] = useState(false);
+    const [showDeleteChatDialog, setShowDeleteChatDialog] = useState(false);
     const menuRef = useRef(null);
     const messagesEndRef = useRef(null);
     const typingTimeoutRef = useRef(null);
@@ -29,7 +30,6 @@ export default function ChatConversation() {
     const audioChunksRef = useRef([]);
     const recordingIntervalRef = useRef(null);
     const inputRef = useRef(null);
-    const emojiPickerRef = useRef(null);
     const audioPreviewRef = useRef(null);
 
     // Normalize message timestamp - ensure createdAt exists
@@ -134,6 +134,15 @@ export default function ChatConversation() {
             }
         });
 
+        // Listen for conversation unmatch events
+        socketService.on('conversation_unmatched', ({ conversationId: unmatchedConvId }) => {
+            console.log('Conversation unmatched:', unmatchedConvId);
+            if (unmatchedConvId === conversationId) {
+                // Navigate back to messages tab
+                navigate('/home', { state: { selectedTab: 'chats' } });
+            }
+        });
+
         return () => {
             socketService.leaveConversation(conversationId);
             socketService.off('new_message');
@@ -142,6 +151,7 @@ export default function ChatConversation() {
             socketService.off('message_delivered');
             socketService.off('user_status');
             socketService.off('message_deleted');
+            socketService.off('conversation_unmatched');
 
             // Cleanup recorded audio if user navigates away
             if (recordedAudio) {
@@ -183,7 +193,6 @@ export default function ChatConversation() {
 
         const textToSend = message.trim();
         setMessage('');
-        setShowEmojiPicker(false);
 
         // Stop typing indicator
         socketService.stopTyping(conversationId, otherUser.id);
@@ -460,6 +469,59 @@ export default function ChatConversation() {
         }
     };
 
+    const handleClearChat = async () => {
+        try {
+            setShowClearChatDialog(false);
+            setShowMenu(false);
+            
+            // Clear messages from UI immediately
+            setMessages([]);
+            
+            // Call API to delete all messages
+            await chatAPI.clearChat(conversationId);
+            console.log('Chat cleared successfully');
+        } catch (error) {
+            console.error('Failed to clear chat:', error);
+            alert('Failed to clear chat. Please try again.');
+            // Reload messages on error
+            loadMessages();
+        }
+    };
+
+    const handleUnmatch = async () => {
+        try {
+            setShowUnmatchDialog(false);
+            setShowMenu(false);
+            
+            // Call API to unmatch
+            await chatAPI.unmatch(conversationId);
+            console.log('Unmatched successfully');
+            
+            // Navigate back to messages tab
+            navigate('/home', { state: { selectedTab: 'chats' } });
+        } catch (error) {
+            console.error('Failed to unmatch:', error);
+            alert('Failed to unmatch. Please try again.');
+        }
+    };
+
+    const handleDeleteChat = async () => {
+        try {
+            setShowDeleteChatDialog(false);
+            setShowMenu(false);
+            
+            // Call API to delete conversation
+            await chatAPI.deleteConversation(conversationId);
+            console.log('Chat deleted successfully');
+            
+            // Navigate back to messages tab
+            navigate('/home', { state: { selectedTab: 'chats' } });
+        } catch (error) {
+            console.error('Failed to delete chat:', error);
+            alert('Failed to delete chat. Please try again.');
+        }
+    };
+
     const formatTime = (timestamp) => {
         if (!timestamp) return '';
 
@@ -485,44 +547,18 @@ export default function ChatConversation() {
             if (menuRef.current && !menuRef.current.contains(event.target)) {
                 setShowMenu(false);
             }
-            if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target)) {
-                setShowEmojiPicker(false);
-            }
         };
 
-        if (showMenu || showEmojiPicker) {
+        if (showMenu) {
             document.addEventListener('mousedown', handleClickOutside);
         }
 
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [showMenu, showEmojiPicker]);
+    }, [showMenu]);
 
-    const handleEmojiClick = (emojiObject) => {
-        const emoji = emojiObject.emoji;
-        const input = inputRef.current;
 
-        if (input) {
-            const start = input.selectionStart;
-            const end = input.selectionEnd;
-            const text = message;
-            const before = text.substring(0, start);
-            const after = text.substring(end);
-            const newText = before + emoji + after;
-
-            setMessage(newText);
-
-            // Set cursor position after emoji
-            setTimeout(() => {
-                input.selectionStart = input.selectionEnd = start + emoji.length;
-                input.focus();
-            }, 0);
-        } else {
-            // Fallback: append to end
-            setMessage(prev => prev + emoji);
-        }
-    };
 
     return (
         <div
@@ -548,8 +584,7 @@ export default function ChatConversation() {
                         <button
                             onClick={() => navigate('/user-profile-info', {
                                 state: {
-                                    userId: otherUser?.id,
-                                    otherUser: otherUser
+                                    userId: otherUser?.id
                                 }
                             })}
                             className="flex-shrink-0"
@@ -564,8 +599,7 @@ export default function ChatConversation() {
                         <button
                             onClick={() => navigate('/user-profile-info', {
                                 state: {
-                                    userId: otherUser?.id,
-                                    otherUser: otherUser
+                                    userId: otherUser?.id
                                 }
                             })}
                             className="flex-1 text-left"
@@ -610,7 +644,10 @@ export default function ChatConversation() {
                                 <div className="h-px bg-gray-300" />
 
                                 <button
-                                    onClick={() => setShowMenu(false)}
+                                    onClick={() => {
+                                        setShowMenu(false);
+                                        setShowClearChatDialog(true);
+                                    }}
                                     className="w-full px-4 py-3 flex items-center justify-between hover:bg-black/5 transition-colors text-left"
                                 >
                                     <span className="text-gray-800 font-medium">Clear chat</span>
@@ -622,7 +659,10 @@ export default function ChatConversation() {
                                 <div className="h-px bg-gray-300" />
 
                                 <button
-                                    onClick={() => setShowMenu(false)}
+                                    onClick={() => {
+                                        setShowMenu(false);
+                                        setShowUnmatchDialog(true);
+                                    }}
                                     className="w-full px-4 py-3 flex items-center justify-between hover:bg-black/5 transition-colors text-left"
                                 >
                                     <span className="text-gray-800 font-medium">Unmatch</span>
@@ -635,7 +675,10 @@ export default function ChatConversation() {
                                 <div className="h-px bg-gray-300" />
 
                                 <button
-                                    onClick={() => setShowMenu(false)}
+                                    onClick={() => {
+                                        setShowMenu(false);
+                                        setShowDeleteChatDialog(true);
+                                    }}
                                     className="w-full px-4 py-3 flex items-center justify-between hover:bg-red-50 transition-colors text-left"
                                 >
                                     <span className="text-red-500 font-medium">Delete</span>
@@ -745,21 +788,6 @@ export default function ChatConversation() {
 
             {/* Input Area */}
             <div className="bg-gradient-to-t from-black/60 to-transparent px-4 py-4 pb-8 z-10 relative">
-                {/* Emoji Picker */}
-                {showEmojiPicker && !isRecording && !recordedAudio && (
-                    <div ref={emojiPickerRef} className="absolute bottom-24 left-4 right-4 z-[15]">
-                        <EmojiPicker
-                            onEmojiClick={handleEmojiClick}
-                            width="100%"
-                            height="350px"
-                            theme="light"
-                            searchDisabled={false}
-                            skinTonesDisabled={false}
-                            previewConfig={{ showPreview: false }}
-                        />
-                    </div>
-                )}
-
                 <div className="flex items-center gap-2">
                     {/* Voice Preview Mode - WhatsApp style */}
                     {recordedAudio ? (
@@ -897,7 +925,7 @@ export default function ChatConversation() {
                                 />
                                 <button
                                     type="button"
-                                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                                    onClick={() => inputRef.current?.focus()}
                                     className="ml-2"
                                 >
                                     <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -985,6 +1013,93 @@ export default function ChatConversation() {
                                         setShowDeleteDialog(false);
                                         setSelectedMessage(null);
                                     }}
+                                    className="w-full py-3 px-4 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Clear Chat Dialog */}
+            {showClearChatDialog && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[45] px-4">
+                    <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-800 mb-2">Clear this chat?</h3>
+                            <p className="text-gray-600 text-sm mb-6">
+                                All messages will be deleted from this chat. The conversation will remain active.
+                            </p>
+
+                            <div className="space-y-3">
+                                <button
+                                    onClick={handleClearChat}
+                                    className="w-full py-3 px-4 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-colors"
+                                >
+                                    Clear chat
+                                </button>
+                                <button
+                                    onClick={() => setShowClearChatDialog(false)}
+                                    className="w-full py-3 px-4 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Unmatch Dialog */}
+            {showUnmatchDialog && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[45] px-4">
+                    <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-800 mb-2">Unmatch with {otherUser?.name}?</h3>
+                            <p className="text-gray-600 text-sm mb-6">
+                                This will remove your match and delete all messages. This action cannot be undone.
+                            </p>
+
+                            <div className="space-y-3">
+                                <button
+                                    onClick={handleUnmatch}
+                                    className="w-full py-3 px-4 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-colors"
+                                >
+                                    Unmatch
+                                </button>
+                                <button
+                                    onClick={() => setShowUnmatchDialog(false)}
+                                    className="w-full py-3 px-4 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Chat Dialog */}
+            {showDeleteChatDialog && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[45] px-4">
+                    <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-800 mb-2">Delete this chat?</h3>
+                            <p className="text-gray-600 text-sm mb-6">
+                                This chat will be removed from your messages. The other person can still see it.
+                            </p>
+
+                            <div className="space-y-3">
+                                <button
+                                    onClick={handleDeleteChat}
+                                    className="w-full py-3 px-4 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-colors"
+                                >
+                                    Delete
+                                </button>
+                                <button
+                                    onClick={() => setShowDeleteChatDialog(false)}
                                     className="w-full py-3 px-4 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200 transition-colors"
                                 >
                                     Cancel

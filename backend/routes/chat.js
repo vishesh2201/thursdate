@@ -32,7 +32,7 @@ router.get('/conversations', auth, async (req, res) => {
   try {
     const userId = req.user.userId;
     
-    // Get all conversations with matched users
+    // Get all conversations with matched users, filtering out soft-deleted conversations
     const [conversations] = await pool.execute(
       `SELECT 
         c.id as conversationId,
@@ -56,17 +56,32 @@ router.get('/conversations', auth, async (req, res) => {
         (SELECT COUNT(*) FROM messages m2 
          WHERE m2.conversation_id = c.id 
          AND m2.status != 'READ' 
-         AND m2.sender_id != ?) as unreadCount
+         AND m2.sender_id != ?
+         AND (
+           (m2.sender_id = ? AND m2.deleted_for_recipient = FALSE) OR
+           (m2.sender_id != ? AND m2.deleted_for_sender = FALSE)
+         )) as unreadCount
       FROM conversations c
       JOIN users u ON u.id = CASE 
         WHEN c.user_id_1 = ? THEN c.user_id_2 
         ELSE c.user_id_1 
       END
       LEFT JOIN messages m ON m.conversation_id = c.id 
-        AND m.id = (SELECT MAX(id) FROM messages WHERE conversation_id = c.id)
-      WHERE c.user_id_1 = ? OR c.user_id_2 = ?
+        AND m.id = (
+          SELECT MAX(id) FROM messages 
+          WHERE conversation_id = c.id
+            AND (
+              (sender_id = ? AND deleted_for_sender = FALSE) OR
+              (sender_id != ? AND deleted_for_recipient = FALSE)
+            )
+        )
+      WHERE (c.user_id_1 = ? OR c.user_id_2 = ?)
+        AND (
+          (c.user_id_1 = ? AND c.deleted_by_user1 = FALSE) OR
+          (c.user_id_2 = ? AND c.deleted_by_user2 = FALSE)
+        )
       ORDER BY c.updated_at DESC`,
-      [userId, userId, userId, userId, userId]
+      [userId, userId, userId, userId, userId, userId, userId, userId, userId, userId, userId]
     );
     
     // Format the response
@@ -115,14 +130,27 @@ router.post('/conversations', auth, async (req, res) => {
     // Normalize user IDs
     const [user1Id, user2Id] = normalizeUserIds(userId, otherUserId);
     
-    // Check if conversation already exists (allow access to existing conversations)
+    // Check if conversation already exists
     const [existing] = await pool.execute(
-      'SELECT id FROM conversations WHERE user_id_1 = ? AND user_id_2 = ?',
+      'SELECT id, deleted_by_user1, deleted_by_user2 FROM conversations WHERE user_id_1 = ? AND user_id_2 = ?',
       [user1Id, user2Id]
     );
     
     if (existing.length > 0) {
-      return res.json({ conversationId: existing[0].id, existed: true });
+      const conversation = existing[0];
+      const deleteColumn = user1Id === userId ? 'deleted_by_user1' : 'deleted_by_user2';
+      const wasDeleted = user1Id === userId ? conversation.deleted_by_user1 : conversation.deleted_by_user2;
+      
+      // If user had deleted this conversation, un-delete it (but messages stay deleted)
+      if (wasDeleted) {
+        await pool.execute(
+          `UPDATE conversations SET ${deleteColumn} = FALSE WHERE id = ?`,
+          [conversation.id]
+        );
+        console.log(`[CREATE CONVERSATION] User ${userId} reopened deleted conversation ${conversation.id}`);
+      }
+      
+      return res.json({ conversationId: conversation.id, existed: true });
     }
     
     // Only check for mutual match when creating a NEW conversation
@@ -203,7 +231,8 @@ router.get('/conversations/:conversationId/messages', auth, async (req, res) => 
     
     console.log('Final params:', params);
     
-    // Execute query - LIMIT cannot be parameterized in MySQL prepared statements
+    // Execute query - Filter out messages deleted by current user
+    // LIMIT cannot be parameterized in MySQL prepared statements
     const query = `
       SELECT 
         m.id,
@@ -214,16 +243,30 @@ router.get('/conversations/:conversationId/messages', auth, async (req, res) => 
         m.status as status,
         m.read_at as readAt,
         m.created_at as createdAt,
+        m.deleted_for_sender,
+        m.deleted_for_recipient,
         u.first_name as senderFirstName,
         u.last_name as senderLastName
       FROM messages m
       JOIN users u ON u.id = m.sender_id
       WHERE m.conversation_id = ?${beforeClause}
+        AND (
+          (m.sender_id = ? AND m.deleted_for_sender = FALSE) OR
+          (m.sender_id != ? AND m.deleted_for_recipient = FALSE)
+        )
       ORDER BY m.id DESC 
       LIMIT ${finalLimit}
     `;
     
+    // Add userId twice for the deleted checks
+    params.push(userId, userId);
+    
+    console.log(`[GET MESSAGES] User ${userId} fetching messages for conversation ${convId}`);
+    console.log(`[GET MESSAGES] Query will filter: sender=${userId} with deleted_for_sender=FALSE OR recipient with deleted_for_recipient=FALSE`);
+    
     const [messages] = await pool.execute(query, params);
+    
+    console.log(`[GET MESSAGES] Found ${messages.length} visible messages for user ${userId}`);
     
     // Format messages
     const formattedMessages = messages.reverse().map(msg => ({
@@ -502,12 +545,13 @@ router.delete('/messages/:messageId', auth, async (req, res) => {
       
       // Mark as deleted for both users
       try {
-        await pool.execute(
+        const [result] = await pool.execute(
           `UPDATE messages 
            SET deleted_for_sender = 1, deleted_for_recipient = 1, deleted_at = CURRENT_TIMESTAMP 
            WHERE id = ?`,
           [msgId]
         );
+        console.log(`[DELETE FOR EVERYONE] Message ${msgId} deleted for both users (${result.affectedRows} rows updated)`);
       } catch (dbError) {
         console.error('Database error updating message:', dbError.message);
         if (dbError.code === 'ECONNRESET' || dbError.code === 'PROTOCOL_CONNECTION_LOST') {
@@ -544,12 +588,13 @@ router.delete('/messages/:messageId', auth, async (req, res) => {
       // Delete for me only
       if (isSender) {
         try {
-          await pool.execute(
+          const [result] = await pool.execute(
             `UPDATE messages 
              SET deleted_for_sender = 1, deleted_at = CURRENT_TIMESTAMP 
              WHERE id = ?`,
             [msgId]
           );
+          console.log(`[DELETE FOR ME] Message ${msgId} deleted for sender ${userId} (${result.affectedRows} rows updated)`);
         } catch (dbError) {
           console.error('Database error updating message:', dbError.message);
           if (dbError.code === 'ECONNRESET' || dbError.code === 'PROTOCOL_CONNECTION_LOST') {
@@ -565,12 +610,13 @@ router.delete('/messages/:messageId', auth, async (req, res) => {
         }
       } else {
         try {
-          await pool.execute(
+          const [result] = await pool.execute(
             `UPDATE messages 
              SET deleted_for_recipient = 1, deleted_at = CURRENT_TIMESTAMP 
              WHERE id = ?`,
             [msgId]
           );
+          console.log(`[DELETE FOR ME] Message ${msgId} deleted for recipient ${userId} (${result.affectedRows} rows updated)`);
         } catch (dbError) {
           console.error('Database error updating message:', dbError.message);
           if (dbError.code === 'ECONNRESET' || dbError.code === 'PROTOCOL_CONNECTION_LOST') {
@@ -591,6 +637,146 @@ router.delete('/messages/:messageId', auth, async (req, res) => {
   } catch (error) {
     console.error('Delete message error:', error);
     res.status(500).json({ error: 'Failed to delete message' });
+  }
+});
+
+// Clear chat - Mark all messages as deleted for current user only (WhatsApp-like)
+router.post('/conversations/:conversationId/clear', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { conversationId } = req.params;
+    const convId = parseInt(conversationId);
+    
+    if (isNaN(convId)) {
+      return res.status(400).json({ error: 'Invalid conversation ID' });
+    }
+    
+    // Verify user is part of this conversation
+    const [convCheck] = await pool.execute(
+      'SELECT user_id_1, user_id_2 FROM conversations WHERE id = ? AND (user_id_1 = ? OR user_id_2 = ?)',
+      [convId, userId, userId]
+    );
+    
+    if (convCheck.length === 0) {
+      return res.status(403).json({ error: 'Access denied to this conversation' });
+    }
+    
+    // Mark all messages as deleted for current user only
+    // Messages sent by user -> mark as deleted_for_sender
+    // Messages received by user -> mark as deleted_for_recipient
+    const [result] = await pool.execute(
+      `UPDATE messages 
+       SET deleted_for_sender = CASE WHEN sender_id = ? THEN 1 ELSE deleted_for_sender END,
+           deleted_for_recipient = CASE WHEN sender_id != ? THEN 1 ELSE deleted_for_recipient END,
+           deleted_at = CURRENT_TIMESTAMP
+       WHERE conversation_id = ?`,
+      [userId, userId, convId]
+    );
+    
+    console.log(`[CLEAR CHAT] User ${userId} cleared conversation ${convId}`);
+    console.log(`[CLEAR CHAT] Marked ${result.affectedRows} messages as deleted for user ${userId}`);
+    console.log(`[CLEAR CHAT] This is a soft delete - other user will still see messages`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Clear chat error:', error);
+    res.status(500).json({ error: 'Failed to clear chat' });
+  }
+});
+
+// Unmatch - Delete conversation and messages for both users
+router.delete('/conversations/:conversationId/unmatch', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { conversationId } = req.params;
+    const convId = parseInt(conversationId);
+    
+    if (isNaN(convId)) {
+      return res.status(400).json({ error: 'Invalid conversation ID' });
+    }
+    
+    // Verify user is part of this conversation and get other user
+    const [convCheck] = await pool.execute(
+      'SELECT user_id_1, user_id_2 FROM conversations WHERE id = ? AND (user_id_1 = ? OR user_id_2 = ?)',
+      [convId, userId, userId]
+    );
+    
+    if (convCheck.length === 0) {
+      return res.status(403).json({ error: 'Access denied to this conversation' });
+    }
+    
+    const conversation = convCheck[0];
+    const otherUserId = conversation.user_id_1 === userId ? conversation.user_id_2 : conversation.user_id_1;
+    
+    // Delete the conversation (CASCADE will delete messages automatically)
+    await pool.execute(
+      'DELETE FROM conversations WHERE id = ?',
+      [convId]
+    );
+    
+    // Also remove the match from user_actions
+    await pool.execute(
+      `UPDATE user_actions 
+       SET action_type = 'unmatch' 
+       WHERE ((user_id = ? AND target_user_id = ?) OR (user_id = ? AND target_user_id = ?))
+       AND action_type = 'like'`,
+      [userId, otherUserId, otherUserId, userId]
+    );
+    
+    // Emit socket event to notify the other user
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user:${otherUserId}`).emit('conversation_unmatched', {
+        conversationId: convId,
+        unmatchedBy: userId
+      });
+      console.log(`Emitted unmatch event to user ${otherUserId} for conversation ${convId}`);
+    }
+    
+    console.log(`User ${userId} unmatched with user ${otherUserId}, conversation ${convId} deleted`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Unmatch error:', error);
+    res.status(500).json({ error: 'Failed to unmatch' });
+  }
+});
+
+// Delete conversation (for current user only)
+router.delete('/conversations/:conversationId', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { conversationId } = req.params;
+    const convId = parseInt(conversationId);
+    
+    if (isNaN(convId)) {
+      return res.status(400).json({ error: 'Invalid conversation ID' });
+    }
+    
+    // Verify user is part of this conversation
+    const [convCheck] = await pool.execute(
+      'SELECT user_id_1, user_id_2 FROM conversations WHERE id = ? AND (user_id_1 = ? OR user_id_2 = ?)',
+      [convId, userId, userId]
+    );
+    
+    if (convCheck.length === 0) {
+      return res.status(403).json({ error: 'Access denied to this conversation' });
+    }
+    
+    const conversation = convCheck[0];
+    
+    // Determine which column to update based on user
+    const deleteColumn = conversation.user_id_1 === userId ? 'deleted_by_user1' : 'deleted_by_user2';
+    
+    // Soft delete - mark as deleted for this user only
+    await pool.execute(
+      `UPDATE conversations SET ${deleteColumn} = TRUE WHERE id = ?`,
+      [convId]
+    );
+    
+    console.log(`User ${userId} deleted conversation ${convId} from their view`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete conversation error:', error);
+    res.status(500).json({ error: 'Failed to delete conversation' });
   }
 });
 

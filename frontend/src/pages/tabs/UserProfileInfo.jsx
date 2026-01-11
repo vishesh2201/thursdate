@@ -5,26 +5,26 @@ import { userAPI } from '../../utils/api';
 export default function UserProfileInfo() {
     const navigate = useNavigate();
     const location = useLocation();
-    const { userId, otherUser } = location.state || {};
-    const [user, setUser] = useState(otherUser || null);
-    const [loading, setLoading] = useState(!otherUser);
+    const { userId } = location.state || {};
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
     const [bioMode, setBioMode] = useState('read');
 
     useEffect(() => {
-        if (!userId && !otherUser) {
+        if (!userId) {
             navigate(-1);
             return;
         }
 
-        // If we don't have full user data, fetch it
-        if (userId && !otherUser) {
-            loadUserProfile();
-        }
-    }, [userId, otherUser, navigate]);
+        // ALWAYS fetch fresh profile data from backend
+        // This ensures consistent, up-to-date information
+        loadUserProfile();
+    }, [userId, navigate]);
 
     const loadUserProfile = async () => {
         try {
             setLoading(true);
+            // Fetch fresh data from users table (authoritative source)
             const data = await userAPI.getUserProfile(userId);
             setUser(data);
         } catch (error) {
@@ -47,15 +47,27 @@ export default function UserProfileInfo() {
         return null;
     }
 
-    const interests = user.interests || ['AI', 'Blockchain', 'Data Science', 'Cybersecurity', 'Robotics', 'Machine Learning', 'Virtual Reality'];
-    const watchlist = user.watchlist || [
-        { title: 'True Detective', director: 'Frank Darabont', thumbnail: '/placeholder-thumb1.jpg' },
-        { title: 'True Blood', director: 'Frank Darabont', thumbnail: '/placeholder-thumb2.jpg' }
-    ];
-    const tunes = user.tunes || [
-        { title: 'Raabta', artist: 'Arijit Singh', thumbnail: '/placeholder-music1.jpg' },
-        { title: 'Raabdi jodi', artist: 'Arijit Singh', thumbnail: '/placeholder-music2.jpg' }
-    ];
+    // Helper function to calculate age
+    const calculateAge = (dob) => {
+        if (!dob) return null;
+        const birthDate = new Date(dob);
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+        }
+        return age;
+    };
+
+    // Use actual user data from backend
+    const interests = user.interests || [];
+    const watchlist = user.intent?.watchList || [];
+    const tvShows = user.intent?.tvShows || [];
+    const movies = user.intent?.movies || [];
+    const artistsBands = user.intent?.artistsBands || [];
+    const lifestyleImages = user.intent?.lifestyleImageUrls?.filter(Boolean) || [];
+    const facePhotos = user.facePhotos?.filter(Boolean) || [];
 
     return (
         <div 
@@ -78,10 +90,10 @@ export default function UserProfileInfo() {
                         <div className="flex flex-col justify-center">
                             <div className="flex items-center gap-1">
                                 <span className="text-white text-[20px] font-normal">{user.firstName || user.name},</span>
-                                <span className="text-white/70 text-[20px] font-normal">{user.age || calculateAge(user.dateOfBirth)}</span>
+                                <span className="text-white/70 text-[20px] font-normal">{user.age || calculateAge(user.dob)}</span>
                             </div>
-                            <p className="text-white text-xs">{user.occupation || 'Director'}</p>
-                            <p className="text-white text-xs">{user.location || 'Bandra, Mumbai'}</p>
+                            <p className="text-white text-xs">{user.intent?.profileQuestions?.jobTitle || 'Not specified'}</p>
+                            <p className="text-white text-xs">{user.currentLocation || user.location || 'Location not specified'}</p>
                         </div>
                     </div>
                     
@@ -104,7 +116,7 @@ export default function UserProfileInfo() {
                                 <path d="M12 13v8m-4-4l4 4 4-4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                             </svg>
                         </div>
-                        <span className="text-[#f1f1f1] text-xs text-center">{user.gender || 'Male'}</span>
+                        <span className="text-[#f1f1f1] text-xs text-center">{user.gender || 'Not specified'}</span>
                     </div>
 
                     <div className="flex flex-col items-center gap-2.5">
@@ -113,7 +125,7 @@ export default function UserProfileInfo() {
                                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
                             </svg>
                         </div>
-                        <span className="text-[#f1f1f1] text-xs text-center">{user.relationshipStatus || 'Divorced'}</span>
+                        <span className="text-[#f1f1f1] text-xs text-center">{user.relationshipStatus || 'Not specified'}</span>
                     </div>
 
                     <div className="flex flex-col items-center gap-2.5">
@@ -123,7 +135,9 @@ export default function UserProfileInfo() {
                                 <circle cx="12" cy="9" r="2.5" strokeWidth="2"/>
                             </svg>
                         </div>
-                        <span className="text-[#f1f1f1] text-xs text-center leading-tight">Bandra,<br/>Mumbai</span>
+                        <span className="text-[#f1f1f1] text-xs text-center leading-tight">
+                            {user.currentLocation || user.location || 'Location not specified'}
+                        </span>
                     </div>
 
                     <div className="flex flex-col items-center gap-2.5">
@@ -133,7 +147,9 @@ export default function UserProfileInfo() {
                                 <circle cx="12" cy="9" r="2.5" strokeWidth="2"/>
                             </svg>
                         </div>
-                        <span className="text-[#f1f1f1] text-xs text-center leading-tight">From HSR,<br/>Bangalore</span>
+                        <span className="text-[#f1f1f1] text-xs text-center leading-tight">
+                            {user.fromLocation ? `From ${user.fromLocation}` : 'Origin not specified'}
+                        </span>
                     </div>
                 </div>
 
@@ -165,7 +181,7 @@ export default function UserProfileInfo() {
                             </button>
                         </div>
                         <p className="text-[#f2f2f2] text-xs leading-[1.4]">
-                            {user.bio || "From boxing ring to monastery walls to...your DMs? Traded punches for prayers, now trading emails for epic adventures. Working remotely & traveling - seeking a co-conspirator for spontaneous fun. From boxing ring to monastery walls to...your DMs? Traded punches for prayers."}
+                            {user.intent?.bio || "No bio available"}
                         </p>
                     </div>
                 </div>
@@ -206,75 +222,63 @@ export default function UserProfileInfo() {
                 </div>
 
                 {/* Entertainment Section */}
-                <div className="space-y-3">
-                    <h3 className="text-[#f2f2f2] text-base font-semibold">Entertainment</h3>
-                    <div className="bg-white/10 rounded-xl p-3 space-y-0.5">
-                        {/* Watchlists */}
-                        <div className="space-y-1">
-                            <h4 className="text-[#f2f2f2] text-sm font-medium mb-1">Watchlists</h4>
-                            {watchlist.map((item, idx) => (
-                                <div key={idx} className="flex gap-2 items-center py-2">
-                                    <div className="w-12 h-12 bg-gray-700 rounded-sm overflow-hidden flex-shrink-0">
-                                        <img 
-                                            src={item.thumbnail} 
-                                            alt={item.title}
-                                            className="w-full h-full object-cover"
-                                            onError={(e) => {
-                                                e.target.src = '/placeholder-thumb.jpg';
-                                            }}
-                                        />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-white text-sm truncate">{item.title}</p>
-                                        <p className="text-white text-sm">
-                                            Directed by <span className="font-bold">{item.director}</span>
-                                        </p>
-                                    </div>
+                {(watchlist.length > 0 || tvShows.length > 0 || movies.length > 0 || artistsBands.length > 0) && (
+                    <div className="space-y-3">
+                        <h3 className="text-[#f2f2f2] text-base font-semibold">Entertainment</h3>
+                        <div className="bg-white/10 rounded-xl p-3 space-y-0.5">
+                            {/* Watchlists */}
+                            {watchlist.length > 0 && (
+                                <div className="space-y-1">
+                                    <h4 className="text-[#f2f2f2] text-sm font-medium mb-1">Watchlist</h4>
+                                    {watchlist.map((item, idx) => (
+                                        <div key={idx} className="py-2">
+                                            <p className="text-white text-sm">{item}</p>
+                                        </div>
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
+                            )}
 
-                        {/* Tunes */}
-                        <div className="space-y-1 pt-2">
-                            <h4 className="text-[#f2f2f2] text-sm font-medium mb-1">Tunes</h4>
-                            {tunes.map((item, idx) => (
-                                <div key={idx} className="flex gap-2 items-center py-2">
-                                    <div className="w-12 h-12 bg-gray-700 rounded-sm overflow-hidden flex-shrink-0">
-                                        <img 
-                                            src={item.thumbnail} 
-                                            alt={item.title}
-                                            className="w-full h-full object-cover"
-                                            onError={(e) => {
-                                                e.target.src = '/placeholder-music.jpg';
-                                            }}
-                                        />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-white text-sm truncate">{item.title}</p>
-                                        <p className="text-white text-sm">
-                                            By <span className="font-bold">{item.artist}</span>
-                                        </p>
-                                    </div>
+                            {/* TV Shows */}
+                            {tvShows.length > 0 && (
+                                <div className="space-y-1 pt-2">
+                                    <h4 className="text-[#f2f2f2] text-sm font-medium mb-1">TV Shows</h4>
+                                    {tvShows.map((show, idx) => (
+                                        <div key={idx} className="py-2">
+                                            <p className="text-white text-sm">{show}</p>
+                                        </div>
+                                    ))}
                                 </div>
-                            ))}
+                            )}
+
+                            {/* Movies */}
+                            {movies.length > 0 && (
+                                <div className="space-y-1 pt-2">
+                                    <h4 className="text-[#f2f2f2] text-sm font-medium mb-1">Movies</h4>
+                                    {movies.map((movie, idx) => (
+                                        <div key={idx} className="py-2">
+                                            <p className="text-white text-sm">{movie}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Artists/Bands */}
+                            {artistsBands.length > 0 && (
+                                <div className="space-y-1 pt-2">
+                                    <h4 className="text-[#f2f2f2] text-sm font-medium mb-1">Music</h4>
+                                    {artistsBands.map((artist, idx) => (
+                                        <div key={idx} className="py-2">
+                                            <p className="text-white text-sm">{artist}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
-                </div>
+                )}
 
                 <div className="h-6"></div>
             </div>
         </div>
     );
-}
-
-function calculateAge(dateOfBirth) {
-    if (!dateOfBirth) return '';
-    const today = new Date();
-    const birthDate = new Date(dateOfBirth);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-        age--;
-    }
-    return age;
 }

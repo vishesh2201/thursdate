@@ -144,4 +144,26 @@ export const userAPI = {
 
         return authRequest('/user/matches/likes-received');
     },
+
+    // Get another user's profile by ID (always fetches fresh data from backend)
+    getUserProfile: async (userId) => {
+        if (isMockMode()) {
+            console.log(`MOCK MODE: Returning mock profile for user ${userId}`);
+            // Return a mock profile with proper structure
+            return {
+                id: userId,
+                firstName: "John",
+                lastName: "Doe",
+                name: "John Doe",
+                age: 28,
+                gender: "Male",
+                currentLocation: "New York, NY",
+                profilePicUrl: "/chatperson.png",
+                intent: {},
+                interests: ["Technology", "Travel", "Photography"],
+            };
+        }
+
+        return authRequest(`/user/profile/${userId}`);
+    },
 };

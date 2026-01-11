@@ -92,6 +92,87 @@ router.get('/profile', auth, async (req, res) => {
     }
 });
 
+// Get another user's profile by ID (for viewing matched users, etc.)
+router.get('/profile/:userId', auth, async (req, res) => {
+    try {
+        if (!(await validateConnection())) {
+            return res.status(500).json({ error: 'Database connection failed' });
+        }
+
+        const targetUserId = parseInt(req.params.userId);
+        if (isNaN(targetUserId)) {
+            return res.status(400).json({ error: 'Invalid user ID' });
+        }
+
+        // Fetch complete user profile from users table (authoritative source)
+        const [users] = await pool.execute(
+            `SELECT id, first_name, last_name, gender, dob, current_location, 
+                    favourite_travel_destination, last_holiday_places, favourite_places_to_go, 
+                    profile_pic_url, intent, interests, pets, drinking, smoking, height, 
+                    religious_level, kids_preference, food_preference, relationship_status, 
+                    from_location, instagram, linkedin, face_photos 
+             FROM users 
+             WHERE id = ? AND approval = true`,
+            [targetUserId]
+        );
+        
+        if (users.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        
+        const user = users[0];
+        
+        // Calculate age
+        let age = null;
+        if (user.dob) {
+            const birthDate = new Date(user.dob);
+            const today = new Date();
+            age = today.getFullYear() - birthDate.getFullYear();
+            const m = today.getMonth() - birthDate.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                age--;
+            }
+        }
+        
+        // Return complete, fresh profile data
+        const profileData = {
+            id: user.id,
+            firstName: user.first_name || null,
+            lastName: user.last_name || null,
+            name: `${user.first_name || ''} ${user.last_name || ''}`.trim(),
+            gender: user.gender || null,
+            age: age,
+            dob: user.dob || null,
+            currentLocation: user.current_location || null,
+            location: user.current_location || null,
+            favouriteTravelDestination: user.favourite_travel_destination || null,
+            lastHolidayPlaces: safeJsonParse(user.last_holiday_places, []),
+            favouritePlacesToGo: safeJsonParse(user.favourite_places_to_go, []),
+            profilePicUrl: user.profile_pic_url || null,
+            intent: safeJsonParse(user.intent, {}),
+            interests: safeJsonParse(user.interests, []),
+            pets: user.pets || null,
+            drinking: user.drinking || null,
+            smoking: user.smoking || null,
+            height: user.height || null,
+            religiousLevel: user.religious_level || null,
+            kidsPreference: user.kids_preference || null,
+            foodPreference: user.food_preference || null,
+            relationshipStatus: user.relationship_status || null,
+            fromLocation: user.from_location || null,
+            instagram: user.instagram || null,
+            linkedin: user.linkedin || null,
+            facePhotos: safeJsonParse(user.face_photos, []),
+        };
+        
+        res.json(profileData);
+        
+    } catch (error) {
+        console.error('Get user profile by ID error:', error);
+        res.status(500).json({ error: 'Internal server error: ' + error.message });
+    }
+});
+
 // Save user profile (for onboarding)
 router.post('/profile', auth, async (req, res) => {
     try {
