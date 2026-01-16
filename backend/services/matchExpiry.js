@@ -234,7 +234,9 @@ async function getMatchedProfilesForUser(userId) {
 }
 
 /**
- * Expire matches that have passed 7 days without a reply
+ * Mark matches as expired for UI visibility after 7 days without a reply
+ * This ONLY affects horizontal matched section visibility
+ * Match validity and chat permissions remain intact
  * This should be run periodically (e.g., via cron job)
  */
 async function expireOldMatches() {
@@ -243,7 +245,7 @@ async function expireOldMatches() {
   try {
     await connection.beginTransaction();
     
-    // Find all matches that should be expired
+    // Find all matches that should be expired (for UI only)
     const [expiredMatches] = await connection.execute(
       `SELECT id, user_id_1, user_id_2
        FROM conversations 
@@ -257,7 +259,8 @@ async function expireOldMatches() {
       return { expired: 0 };
     }
     
-    // Mark conversations as expired
+    // Mark conversations as expired (UI-only flag)
+    // This removes profiles from horizontal section but preserves match and chat access
     await connection.execute(
       `UPDATE conversations 
        SET match_expired = TRUE
@@ -266,20 +269,13 @@ async function expireOldMatches() {
          AND reply_at IS NULL`
     );
     
-    // Unmatch users (change action to 'unmatch')
-    for (const match of expiredMatches) {
-      await connection.execute(
-        `UPDATE user_actions 
-         SET action_type = 'unmatch'
-         WHERE (user_id = ? AND target_user_id = ?)
-            OR (user_id = ? AND target_user_id = ?)`,
-        [match.user_id_1, match.user_id_2, match.user_id_2, match.user_id_1]
-      );
-    }
+    // NOTE: We DO NOT change user_actions to 'unmatch'
+    // The match remains valid, users can still chat
+    // Only UI visibility in horizontal section is affected
     
     await connection.commit();
     
-    console.log(`Expired ${expiredMatches.length} matches`);
+    console.log(`Marked ${expiredMatches.length} matches as expired (UI-only, chat still enabled)`);
     
     return {
       expired: expiredMatches.length,
@@ -288,7 +284,7 @@ async function expireOldMatches() {
     
   } catch (error) {
     await connection.rollback();
-    console.error('Error expiring old matches:', error);
+    console.error('Error marking matches as expired:', error);
     throw error;
   } finally {
     connection.release();
@@ -296,7 +292,8 @@ async function expireOldMatches() {
 }
 
 /**
- * Manually expire a specific match
+ * Manually mark a specific match as expired (UI-only)
+ * This removes the profile from horizontal section but preserves chat access
  * @param {number} conversationId - The conversation ID to expire
  */
 async function expireMatch(conversationId) {
@@ -315,22 +312,14 @@ async function expireMatch(conversationId) {
       throw new Error('Conversation not found');
     }
     
-    const { user_id_1, user_id_2 } = conv[0];
-    
-    // Mark as expired
+    // Mark as expired (UI-only flag)
     await connection.execute(
       'UPDATE conversations SET match_expired = TRUE WHERE id = ?',
       [conversationId]
     );
     
-    // Unmatch users
-    await connection.execute(
-      `UPDATE user_actions 
-       SET action_type = 'unmatch'
-       WHERE (user_id = ? AND target_user_id = ?)
-          OR (user_id = ? AND target_user_id = ?)`,
-      [user_id_1, user_id_2, user_id_2, user_id_1]
-    );
+    // NOTE: We DO NOT unmatch users
+    // Match and chat access remain valid
     
     await connection.commit();
     

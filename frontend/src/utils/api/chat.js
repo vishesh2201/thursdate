@@ -93,4 +93,40 @@ export const chatAPI = {
             body: JSON.stringify({ deleteType }),
         });
     },
+
+    // Clear chat - Delete all messages but keep conversation
+    clearChat: async (conversationId) => {
+        if (isMockMode()) {
+            console.log("MOCK MODE: Simulating clear chat.");
+            return { success: true };
+        }
+        
+        return authRequest(`/chat/conversations/${conversationId}/clear`, {
+            method: 'POST',
+        });
+    },
+
+    // Unmatch - Remove match and delete conversation for both users
+    unmatch: async (conversationId) => {
+        if (isMockMode()) {
+            console.log("MOCK MODE: Simulating unmatch.");
+            return { success: true };
+        }
+        
+        return authRequest(`/chat/conversations/${conversationId}/unmatch`, {
+            method: 'DELETE',
+        });
+    },
+
+    // Delete conversation - Remove from current user's view only
+    deleteConversation: async (conversationId) => {
+        if (isMockMode()) {
+            console.log("MOCK MODE: Simulating delete conversation.");
+            return { success: true };
+        }
+        
+        return authRequest(`/chat/conversations/${conversationId}`, {
+            method: 'DELETE',
+        });
+    },
 };

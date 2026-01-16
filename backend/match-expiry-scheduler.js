@@ -1,6 +1,10 @@
 /**
- * Automatic match expiry scheduler
+ * Automatic match expiry scheduler (UI-only)
  * Runs the cleanup job every hour using node-cron
+ * - Marks matches as expired after 7 days without messages
+ * - Removes profiles from horizontal matched section
+ * - Does NOT unmatch users or block chat access
+ * Match validity and chat permissions remain intact
  * 
  * Usage:
  * - Install node-cron: npm install node-cron
@@ -11,19 +15,21 @@
 const cron = require('node-cron');
 const matchExpiryService = require('./services/matchExpiry');
 
-console.log('🕒 Match expiry scheduler started');
+console.log('🕒 Match expiry scheduler started (UI-only)');
 console.log('   Running cleanup every hour at minute 0');
+console.log('   Note: Only affects horizontal section visibility, not match validity\n');
 
 // Run every hour at minute 0
 cron.schedule('0 * * * *', async () => {
-  console.log('\n📅 Running scheduled match expiry cleanup...');
+  console.log('\n📅 Running scheduled match expiry marking (UI-only)...');
   console.log('   Time:', new Date().toISOString());
   
   try {
     const result = await matchExpiryService.expireOldMatches();
     
     console.log('✅ Scheduled cleanup completed');
-    console.log(`   - Expired matches: ${result.expired}`);
+    console.log(`   - Matches marked as expired (UI-only): ${result.expired}`);
+    console.log(`   - Chat access still enabled for all matches`);
     
     if (result.expired > 0) {
       console.log('   - Expired match details:');
@@ -42,7 +48,7 @@ cron.schedule('0 * * * *', async () => {
   try {
     const result = await matchExpiryService.expireOldMatches();
     console.log('✅ Initial cleanup completed');
-    console.log(`   - Expired matches: ${result.expired}`);
+    console.log(`   - Matches marked as expired (UI-only): ${result.expired}`);
   } catch (error) {
     console.error('❌ Initial cleanup failed:', error);
   }

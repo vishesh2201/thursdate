@@ -1,5 +1,11 @@
 /**
- * Cron job to clean up expired matches
+ * Cron job to mark expired matches (UI-only)
+ * This marks matches that have passed 7 days without messages as expired
+ * - Removes profiles from horizontal matched section
+ * - Does NOT unmatch users
+ * - Does NOT block chat access
+ * Match validity and chat permissions remain intact
+ * 
  * This should be run periodically (e.g., every hour or every day)
  * 
  * Usage:
@@ -11,14 +17,16 @@
 const matchExpiryService = require('./services/matchExpiry');
 
 async function runCleanup() {
-  console.log('Starting expired matches cleanup...');
+  console.log('Starting match expiry marking (UI-only)...');
   console.log('Time:', new Date().toISOString());
+  console.log('Note: This only affects horizontal section visibility, not match validity\n');
   
   try {
     const result = await matchExpiryService.expireOldMatches();
     
     console.log(`✅ Cleanup completed successfully`);
-    console.log(`   - Expired matches: ${result.expired}`);
+    console.log(`   - Matches marked as expired (UI-only): ${result.expired}`);
+    console.log(`   - Chat access still enabled for all matches`);
     
     if (result.expired > 0) {
       console.log('   - Expired match details:');
