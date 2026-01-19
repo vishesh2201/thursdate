@@ -144,4 +144,31 @@ export const userAPI = {
 
         return authRequest('/user/matches/likes-received');
     },
+
+    // Get another user's profile by ID (always fetches fresh data from backend)
+    // ✅ If conversationId provided, backend filters by visibility level
+    getUserProfile: async (userId, conversationId = null) => {
+        if (isMockMode()) {
+            console.log(`MOCK MODE: Returning mock profile for user ${userId}`);
+            // Return a mock profile with proper structure
+            return {
+                id: userId,
+                firstName: "John",
+                lastName: "Doe",
+                name: "John Doe",
+                age: 28,
+                gender: "Male",
+                currentLocation: "New York, NY",
+                profilePicUrl: "/chatperson.png",
+                intent: {},
+                interests: ["Technology", "Travel", "Photography"],
+            };
+        }
+
+        const url = conversationId 
+            ? `/user/profile/${userId}?conversationId=${conversationId}`
+            : `/user/profile/${userId}`;
+        
+        return authRequest(url);
+    },
 };

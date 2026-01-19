@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { userAPI } from '../../utils/api';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { userAPI, chatAPI, uploadAPI } from '../../utils/api';
 import {
     WheelPicker,
     WheelPickerWrapper,
@@ -8,9 +8,13 @@ import {
 
 export default function ProfileQuestions() {
     const navigate = useNavigate();
+    const location = useLocation();
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
+    
+    // Get navigation state for level-only flows
+    const { levelOnly, returnTo, returnState } = location.state || {};
 
     // Question states
     const [education, setEducation] = useState('');
@@ -37,8 +41,10 @@ export default function ProfileQuestions() {
     const [relationshipValues, setRelationshipValues] = useState([]);
     const [livingSituation, setLivingSituation] = useState('');
     const [livingSituationCustom, setLivingSituationCustom] = useState('');
+    const [facePhotos, setFacePhotos] = useState([null, null, null, null, null, null]);
+    const [uploading, setUploading] = useState(false);
 
-    const totalSteps = 15; // Updated to include all questions
+    const totalSteps = 16; // Updated to include all questions + face photos
 
     // Load existing profile data
     useEffect(() => {
@@ -75,6 +81,13 @@ export default function ProfileQuestions() {
                     if (pq.relationshipValues) setRelationshipValues(pq.relationshipValues);
                     if (pq.livingSituation) setLivingSituation(pq.livingSituation);
                     if (pq.livingSituationCustom) setLivingSituationCustom(pq.livingSituationCustom);
+                }
+
+                // Load face photos
+                if (userData.facePhotos && userData.facePhotos.length > 0) {
+                    const photos = [...userData.facePhotos];
+                    while (photos.length < 6) photos.push(null);
+                    setFacePhotos(photos.slice(0, 6));
                 }
             } catch (err) {
                 console.error('Failed to load profile', err);
@@ -130,6 +143,7 @@ export default function ProfileQuestions() {
             case 13: return !!favoriteCafe;
             case 14: return relationshipValues.length > 0;
             case 15: return !!livingSituation && (livingSituation !== 'Other' || !!livingSituationCustom);
+            case 16: return facePhotos.filter(Boolean).length >= 4;
             default: return false;
         }
     };
@@ -164,6 +178,7 @@ export default function ProfileQuestions() {
                 religiousLevel,
                 kidsPreference: kids,
                 foodPreference,
+                facePhotos: facePhotos.filter(Boolean),
                 // Keep non-matchable fields in intent for flexibility
                 intent: {
                     ...currentProfile.intent,
@@ -185,14 +200,50 @@ export default function ProfileQuestions() {
                         livingSituationCustom: livingSituation === 'Other' ? livingSituationCustom : null,
                     },
                 },
-                onboardingComplete: true,
+                onboardingComplete: levelOnly ? undefined : true,
             });
-            navigate('/profile-photos');
+            
+            // If this is a level 2 only flow, mark it as complete and navigate back
+            if (levelOnly === 2 && returnState?.openConversation?.conversationId) {
+                try {
+                    await chatAPI.completeLevel2(returnState.openConversation.conversationId);
+                    console.log('[Level 2] Marked as complete for conversation', returnState.openConversation.conversationId);
+                } catch (err) {
+                    console.error('[Level 2] Failed to mark complete:', err);
+                }
+                navigate(returnTo || '/home', { state: returnState });
+            } else {
+                navigate('/profile-photos');
+            }
         } catch (err) {
             console.error('Save failed', err);
             alert('Failed to save. ' + (err.message || ''));
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handlePhotoChange = async (idx, file) => {
+        // Set preview immediately
+        setFacePhotos(prev => {
+            const updated = [...prev];
+            updated[idx] = URL.createObjectURL(file);
+            return updated;
+        });
+
+        // Upload to server immediately
+        try {
+            setUploading(true);
+            const res = await uploadAPI.uploadFacePhoto(file);
+            setFacePhotos(prev => {
+                const updated = [...prev];
+                updated[idx] = res.url;
+                return updated;
+            });
+        } catch (err) {
+            console.error('Upload failed:', err);
+        } finally {
+            setUploading(false);
         }
     };
 
@@ -1198,19 +1249,124 @@ export default function ProfileQuestions() {
                             </div>
                         </div>
                     )}
+
+                    {/* Step 16: Face Photos */}
+                    {step === 16 && (
+                        <div className="space-y-6">
+                            <div>
+                                <h2 className="text-white text-2xl font-bold mb-3">
+                                    Add Your Face Photos
+                                </h2>
+                                <p className="text-white/70 text-sm mb-6">
+                                    Upload at least 4 clear photos of yourself. This will be shared at Level 3 (after 10 messages) to help build trust and genuine connections.
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-3">
+                                {facePhotos.map((photo, idx) => (
+                                    <div key={idx} className="relative aspect-square">
+                                        {photo ? (
+                                            <div className="relative w-full h-full">
+                                                <img
+                                                    src={photo}
+                                                    alt={`Face ${idx + 1}`}
+                                                    className="w-full h-full object-cover rounded-xl"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setFacePhotos(prev => {
+                                                            const updated = [...prev];
+                                                            updated[idx] = null;
+                                                            return updated;
+                                                        });
+                                                    }}
+                                                    className="absolute top-2 right-2 w-6 h-6 bg-black/60 rounded-full flex items-center justify-center text-white hover:bg-black/80"
+                                                >
+                                                    ×
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <label className="w-full h-full flex flex-col items-center justify-center bg-white/10 backdrop-blur-sm border-2 border-dashed border-white/30 rounded-xl cursor-pointer hover:bg-white/15 transition">
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    onChange={(e) => {
+                                                        if (e.target.files?.[0]) {
+                                                            handlePhotoChange(idx, e.target.files[0]);
+                                                        }
+                                                    }}
+                                                    className="hidden"
+                                                    disabled={uploading}
+                                                />
+                                                <svg
+                                                    className="w-8 h-8 text-white/50 mb-1"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke="currentColor"
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        strokeWidth={2}
+                                                        d="M12 4v16m8-8H4"
+                                                    />
+                                                </svg>
+                                                <span className="text-white/50 text-xs">Add Photo</span>
+                                            </label>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="mt-4 p-4 bg-white/10 backdrop-blur-sm rounded-xl">
+                                <div className="flex items-start gap-3">
+                                    <svg
+                                        className="w-5 h-5 text-white/70 flex-shrink-0 mt-0.5"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                        />
+                                    </svg>
+                                    <div className="text-white/70 text-sm">
+                                        <p className="font-medium mb-1">Why face photos?</p>
+                                        <p>These photos will only be shown at Level 3, after you and your match have exchanged 10 messages. This helps build trust gradually.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {uploading && (
+                                <div className="text-center text-white/70 text-sm">
+                                    Uploading photo...
+                                </div>
+                            )}
+
+                            <div className="text-center text-white/70 text-sm">
+                                {facePhotos.filter(Boolean).length}/6 photos added
+                                <br />
+                                (minimum 4 required)
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Footer - Save Button */}
                 <div className="p-6 pt-4">
                     <button
                         onClick={handleNext}
-                        disabled={!canProceed() || loading}
-                        className={`w-full py-4 rounded-xl font-semibold text-base transition-all ${canProceed() && !loading
+                        disabled={!canProceed() || loading || uploading}
+                        className={`w-full py-4 rounded-xl font-semibold text-base transition-all ${canProceed() && !loading && !uploading
                             ? 'bg-white text-black hover:bg-gray-100'
                             : 'bg-white/30 text-white/50 cursor-not-allowed'
                             }`}
                     >
-                        {loading ? 'Saving...' : step === totalSteps ? 'Save' : 'Next'}
+                        {loading ? 'Saving...' : uploading ? 'Uploading...' : step === totalSteps ? 'Save' : 'Next'}
                     </button>
                 </div>
             </div>

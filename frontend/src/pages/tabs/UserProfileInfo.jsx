@@ -5,28 +5,42 @@ import { userAPI } from '../../utils/api';
 export default function UserProfileInfo() {
     const navigate = useNavigate();
     const location = useLocation();
-    const { userId, otherUser } = location.state || {};
-    const [user, setUser] = useState(otherUser || null);
-    const [loading, setLoading] = useState(!otherUser);
+    const { userId, conversationId } = location.state || {};
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
     const [bioMode, setBioMode] = useState('read');
 
     useEffect(() => {
-        if (!userId && !otherUser) {
+        if (!userId) {
             navigate(-1);
             return;
         }
 
-        // If we don't have full user data, fetch it
-        if (userId && !otherUser) {
-            loadUserProfile();
-        }
-    }, [userId, otherUser, navigate]);
+        // ALWAYS fetch fresh profile data from backend
+        // ✅ If conversationId provided, backend will filter by level
+        loadUserProfile();
+    }, [userId, conversationId, navigate]);
+
+    // ✅ Reload profile when page becomes visible (e.g., returning from profile questions)
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (!document.hidden && userId) {
+                console.log('[Profile] Page visible, reloading profile...');
+                loadUserProfile();
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, [userId, conversationId]);
 
     const loadUserProfile = async () => {
         try {
             setLoading(true);
-            const data = await userAPI.getUserProfile(userId);
+            // ✅ Fetch with conversationId to enable level-based filtering
+            const data = await userAPI.getUserProfile(userId, conversationId);
             setUser(data);
+            console.log('[Profile] Loaded profile, visibility level:', data.visibilityLevel);
         } catch (error) {
             console.error('Failed to load user profile:', error);
             navigate(-1);
@@ -47,15 +61,27 @@ export default function UserProfileInfo() {
         return null;
     }
 
-    const interests = user.interests || ['AI', 'Blockchain', 'Data Science', 'Cybersecurity', 'Robotics', 'Machine Learning', 'Virtual Reality'];
-    const watchlist = user.watchlist || [
-        { title: 'True Detective', director: 'Frank Darabont', thumbnail: '/placeholder-thumb1.jpg' },
-        { title: 'True Blood', director: 'Frank Darabont', thumbnail: '/placeholder-thumb2.jpg' }
-    ];
-    const tunes = user.tunes || [
-        { title: 'Raabta', artist: 'Arijit Singh', thumbnail: '/placeholder-music1.jpg' },
-        { title: 'Raabdi jodi', artist: 'Arijit Singh', thumbnail: '/placeholder-music2.jpg' }
-    ];
+    // Helper function to calculate age
+    const calculateAge = (dob) => {
+        if (!dob) return null;
+        const birthDate = new Date(dob);
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+        }
+        return age;
+    };
+
+    // Use actual user data from backend
+    const interests = user.interests || [];
+    const watchlist = user.intent?.watchList || [];
+    const tvShows = user.intent?.tvShows || [];
+    const movies = user.intent?.movies || [];
+    const artistsBands = user.intent?.artistsBands || [];
+    const lifestyleImages = user.intent?.lifestyleImageUrls?.filter(Boolean) || [];
+    const facePhotos = user.facePhotos?.filter(Boolean) || [];
 
     return (
         <div 
@@ -78,10 +104,10 @@ export default function UserProfileInfo() {
                         <div className="flex flex-col justify-center">
                             <div className="flex items-center gap-1">
                                 <span className="text-white text-[20px] font-normal">{user.firstName || user.name},</span>
-                                <span className="text-white/70 text-[20px] font-normal">{user.age || calculateAge(user.dateOfBirth)}</span>
+                                <span className="text-white/70 text-[20px] font-normal">{user.age || calculateAge(user.dob)}</span>
                             </div>
-                            <p className="text-white text-xs">{user.occupation || 'Director'}</p>
-                            <p className="text-white text-xs">{user.location || 'Bandra, Mumbai'}</p>
+                            <p className="text-white text-xs">{user.intent?.profileQuestions?.jobTitle || 'Not specified'}</p>
+                            <p className="text-white text-xs">{user.currentLocation || user.location || 'Location not specified'}</p>
                         </div>
                     </div>
                     
@@ -104,7 +130,7 @@ export default function UserProfileInfo() {
                                 <path d="M12 13v8m-4-4l4 4 4-4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                             </svg>
                         </div>
-                        <span className="text-[#f1f1f1] text-xs text-center">{user.gender || 'Male'}</span>
+                        <span className="text-[#f1f1f1] text-xs text-center">{user.gender || 'Not specified'}</span>
                     </div>
 
                     <div className="flex flex-col items-center gap-2.5">
@@ -113,7 +139,7 @@ export default function UserProfileInfo() {
                                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
                             </svg>
                         </div>
-                        <span className="text-[#f1f1f1] text-xs text-center">{user.relationshipStatus || 'Divorced'}</span>
+                        <span className="text-[#f1f1f1] text-xs text-center">{user.relationshipStatus || 'Not specified'}</span>
                     </div>
 
                     <div className="flex flex-col items-center gap-2.5">
@@ -123,7 +149,9 @@ export default function UserProfileInfo() {
                                 <circle cx="12" cy="9" r="2.5" strokeWidth="2"/>
                             </svg>
                         </div>
-                        <span className="text-[#f1f1f1] text-xs text-center leading-tight">Bandra,<br/>Mumbai</span>
+                        <span className="text-[#f1f1f1] text-xs text-center leading-tight">
+                            {user.currentLocation || user.location || 'Location not specified'}
+                        </span>
                     </div>
 
                     <div className="flex flex-col items-center gap-2.5">
@@ -133,7 +161,9 @@ export default function UserProfileInfo() {
                                 <circle cx="12" cy="9" r="2.5" strokeWidth="2"/>
                             </svg>
                         </div>
-                        <span className="text-[#f1f1f1] text-xs text-center leading-tight">From HSR,<br/>Bangalore</span>
+                        <span className="text-[#f1f1f1] text-xs text-center leading-tight">
+                            {user.fromLocation ? `From ${user.fromLocation}` : 'Origin not specified'}
+                        </span>
                     </div>
                 </div>
 
@@ -165,7 +195,7 @@ export default function UserProfileInfo() {
                             </button>
                         </div>
                         <p className="text-[#f2f2f2] text-xs leading-[1.4]">
-                            {user.bio || "From boxing ring to monastery walls to...your DMs? Traded punches for prayers, now trading emails for epic adventures. Working remotely & traveling - seeking a co-conspirator for spontaneous fun. From boxing ring to monastery walls to...your DMs? Traded punches for prayers."}
+                            {user.intent?.bio || "No bio available"}
                         </p>
                     </div>
                 </div>
@@ -205,76 +235,238 @@ export default function UserProfileInfo() {
                     </div>
                 </div>
 
-                {/* Entertainment Section */}
-                <div className="space-y-3">
-                    <h3 className="text-[#f2f2f2] text-base font-semibold">Entertainment</h3>
-                    <div className="bg-white/10 rounded-xl p-3 space-y-0.5">
-                        {/* Watchlists */}
-                        <div className="space-y-1">
-                            <h4 className="text-[#f2f2f2] text-sm font-medium mb-1">Watchlists</h4>
-                            {watchlist.map((item, idx) => (
-                                <div key={idx} className="flex gap-2 items-center py-2">
-                                    <div className="w-12 h-12 bg-gray-700 rounded-sm overflow-hidden flex-shrink-0">
-                                        <img 
-                                            src={item.thumbnail} 
-                                            alt={item.title}
-                                            className="w-full h-full object-cover"
-                                            onError={(e) => {
-                                                e.target.src = '/placeholder-thumb.jpg';
-                                            }}
-                                        />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-white text-sm truncate">{item.title}</p>
-                                        <p className="text-white text-sm">
-                                            Directed by <span className="font-bold">{item.director}</span>
-                                        </p>
+                {/* Level 2 Lifestyle & Preferences Section */}
+                {user.visibilityLevel >= 2 && (
+                    <div className="space-y-3">
+                        <h3 className="text-[#f2f2f2] text-base font-semibold">Lifestyle & Preferences</h3>
+                        <div className="bg-white/10 rounded-xl p-[18px] space-y-3">
+                            {user.pets && (
+                                <div className="flex justify-between items-center border-b border-white/10 pb-3">
+                                    <span className="text-[#f2f2f2]/70 text-sm">Pets</span>
+                                    <span className="text-white text-sm font-medium">{user.pets}</span>
+                                </div>
+                            )}
+                            {user.drinking && (
+                                <div className="flex justify-between items-center border-b border-white/10 pb-3">
+                                    <span className="text-[#f2f2f2]/70 text-sm">Drinking</span>
+                                    <span className="text-white text-sm font-medium">{user.drinking}</span>
+                                </div>
+                            )}
+                            {user.smoking && (
+                                <div className="flex justify-between items-center border-b border-white/10 pb-3">
+                                    <span className="text-[#f2f2f2]/70 text-sm">Smoking</span>
+                                    <span className="text-white text-sm font-medium">{user.smoking}</span>
+                                </div>
+                            )}
+                            {user.height && (
+                                <div className="flex justify-between items-center border-b border-white/10 pb-3">
+                                    <span className="text-[#f2f2f2]/70 text-sm">Height</span>
+                                    <span className="text-white text-sm font-medium">{user.height} cm</span>
+                                </div>
+                            )}
+                            {user.foodPreference && (
+                                <div className="flex justify-between items-center border-b border-white/10 pb-3">
+                                    <span className="text-[#f2f2f2]/70 text-sm">Food</span>
+                                    <span className="text-white text-sm font-medium">{user.foodPreference}</span>
+                                </div>
+                            )}
+                            {user.religiousLevel && (
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[#f2f2f2]/70 text-sm">Religious Level</span>
+                                    <span className="text-white text-sm font-medium">{user.religiousLevel}</span>
+                                </div>
+                            )}
+                            
+                            {/* Level 2 Profile Questions */}
+                            {user.intent?.profileQuestions?.jobTitle && (
+                                <div className="flex justify-between items-center border-t border-white/10 pt-3">
+                                    <span className="text-[#f2f2f2]/70 text-sm">Job Title</span>
+                                    <span className="text-white text-sm font-medium">{user.intent.profileQuestions.jobTitle}</span>
+                                </div>
+                            )}
+                            {user.intent?.profileQuestions?.companyName && (
+                                <div className="flex justify-between items-center border-t border-white/10 pt-3">
+                                    <span className="text-[#f2f2f2]/70 text-sm">Company</span>
+                                    <span className="text-white text-sm font-medium">{user.intent.profileQuestions.companyName}</span>
+                                </div>
+                            )}
+                            {user.intent?.profileQuestions?.education && (
+                                <div className="flex justify-between items-center border-t border-white/10 pt-3">
+                                    <span className="text-[#f2f2f2]/70 text-sm">Education</span>
+                                    <span className="text-white text-sm font-medium">
+                                        {user.intent.profileQuestions.education}
+                                        {user.intent.profileQuestions.educationDetail && 
+                                            ` - ${user.intent.profileQuestions.educationDetail}`}
+                                    </span>
+                                </div>
+                            )}
+                            {user.intent?.profileQuestions?.languages && user.intent.profileQuestions.languages.length > 0 && (
+                                <div className="flex justify-between items-center border-t border-white/10 pt-3">
+                                    <span className="text-[#f2f2f2]/70 text-sm">Languages</span>
+                                    <span className="text-white text-sm font-medium">{user.intent.profileQuestions.languages.join(', ')}</span>
+                                </div>
+                            )}
+                            {user.intent?.profileQuestions?.sleepSchedule && (
+                                <div className="flex justify-between items-center border-t border-white/10 pt-3">
+                                    <span className="text-[#f2f2f2]/70 text-sm">Sleep Schedule</span>
+                                    <span className="text-white text-sm font-medium">{user.intent.profileQuestions.sleepSchedule}</span>
+                                </div>
+                            )}
+                            {user.intent?.profileQuestions?.dateBill && (
+                                <div className="flex justify-between items-center border-t border-white/10 pt-3">
+                                    <span className="text-[#f2f2f2]/70 text-sm">Date Bill Preference</span>
+                                    <span className="text-white text-sm font-medium">{user.intent.profileQuestions.dateBill}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Level 3 Personal & Deep Information Section */}
+                {user.visibilityLevel >= 3 && (
+                    <div className="space-y-3">
+                        <h3 className="text-[#f2f2f2] text-base font-semibold">Personal Information</h3>
+                        <div className="bg-white/10 rounded-xl p-[18px] space-y-3">
+                            {user.intent?.profileQuestions?.religion && (
+                                <div className="flex justify-between items-center border-b border-white/10 pb-3">
+                                    <span className="text-[#f2f2f2]/70 text-sm">Religion</span>
+                                    <span className="text-white text-sm font-medium">{user.intent.profileQuestions.religion}</span>
+                                </div>
+                            )}
+                            {user.intent?.profileQuestions?.livingSituation && (
+                                <div className="flex justify-between items-center border-b border-white/10 pb-3">
+                                    <span className="text-[#f2f2f2]/70 text-sm">Lives alone or with family?</span>
+                                    <span className="text-white text-sm font-medium">{user.intent.profileQuestions.livingSituation}</span>
+                                </div>
+                            )}
+                            {user.intent?.profileQuestions?.relationshipValues && user.intent.profileQuestions.relationshipValues.length > 0 && (
+                                <div className="border-b border-white/10 pb-3">
+                                    <span className="text-[#f2f2f2]/70 text-sm">Relationship Values</span>
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                        {user.intent.profileQuestions.relationshipValues.map((value, idx) => (
+                                            <span key={idx} className="bg-white/10 rounded-full px-3 py-1 text-white text-xs">
+                                                {value}
+                                            </span>
+                                        ))}
                                     </div>
                                 </div>
-                            ))}
+                            )}
+                            {user.kidsPreference && (
+                                <div className="flex justify-between items-center border-b border-white/10 pb-3">
+                                    <span className="text-[#f2f2f2]/70 text-sm">Kids Preference</span>
+                                    <span className="text-white text-sm font-medium">{user.kidsPreference}</span>
+                                </div>
+                            )}
+                            {user.favouriteTravelDestination && (
+                                <div className="flex justify-between items-center border-b border-white/10 pb-3">
+                                    <span className="text-[#f2f2f2]/70 text-sm">Favorite holiday destination </span>
+                                    <span className="text-white text-sm font-medium">{user.favouriteTravelDestination}</span>
+                                </div>
+                            )}
+                            {user.lastHolidayPlaces && user.lastHolidayPlaces.length > 0 && (
+                                <div className="border-b border-white/10 pb-3">
+                                    <span className="text-[#f2f2f2]/70 text-sm">Last Holiday Places</span>
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                        {user.lastHolidayPlaces.map((place, idx) => (
+                                            <span key={idx} className="bg-white/10 rounded-full px-3 py-1 text-white text-xs">
+                                                {typeof place === 'string' ? place : place?.name || place?.details || ''}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {user.favouritePlacesToGo && user.favouritePlacesToGo.length > 0 && (
+                                <div className="border-b border-white/10 pb-3">
+                                    <span className="text-[#f2f2f2]/70 text-sm">Favorite Places to Go</span>
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                        {user.favouritePlacesToGo.map((place, idx) => (
+                                            <span key={idx} className="bg-white/10 rounded-full px-3 py-1 text-white text-xs">
+                                                {typeof place === 'string' ? place : place?.name || place?.details || ''}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
+                    </div>
+                )}
 
-                        {/* Tunes */}
-                        <div className="space-y-1 pt-2">
-                            <h4 className="text-[#f2f2f2] text-sm font-medium mb-1">Tunes</h4>
-                            {tunes.map((item, idx) => (
-                                <div key={idx} className="flex gap-2 items-center py-2">
-                                    <div className="w-12 h-12 bg-gray-700 rounded-sm overflow-hidden flex-shrink-0">
-                                        <img 
-                                            src={item.thumbnail} 
-                                            alt={item.title}
-                                            className="w-full h-full object-cover"
-                                            onError={(e) => {
-                                                e.target.src = '/placeholder-music.jpg';
-                                            }}
-                                        />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-white text-sm truncate">{item.title}</p>
-                                        <p className="text-white text-sm">
-                                            By <span className="font-bold">{item.artist}</span>
-                                        </p>
-                                    </div>
+                {/* Face Photos Section (Level 3) */}
+                {user.visibilityLevel >= 3 && facePhotos.length > 0 && (
+                    <div className="space-y-3">
+                        <h3 className="text-[#f2f2f2] text-base font-semibold">More Photos</h3>
+                        <div className="grid grid-cols-2 gap-3">
+                            {facePhotos.map((photo, idx) => (
+                                <div key={idx} className="aspect-square rounded-xl overflow-hidden bg-white/10">
+                                    <img 
+                                        src={photo} 
+                                        alt={`Face photo ${idx + 1}`}
+                                        className="w-full h-full object-cover"
+                                    />
                                 </div>
                             ))}
                         </div>
                     </div>
-                </div>
+                )}
+
+                {/* Entertainment Section */}
+                {(watchlist.length > 0 || tvShows.length > 0 || movies.length > 0 || artistsBands.length > 0) && (
+                    <div className="space-y-3">
+                        <h3 className="text-[#f2f2f2] text-base font-semibold">Entertainment</h3>
+                        <div className="bg-white/10 rounded-xl p-3 space-y-0.5">
+                            {/* Watchlists */}
+                            {watchlist.length > 0 && (
+                                <div className="space-y-1">
+                                    <h4 className="text-[#f2f2f2] text-sm font-medium mb-1">Watchlist</h4>
+                                    {watchlist.map((item, idx) => (
+                                        <div key={idx} className="py-2">
+                                            <p className="text-white text-sm">{item}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* TV Shows */}
+                            {tvShows.length > 0 && (
+                                <div className="space-y-1 pt-2">
+                                    <h4 className="text-[#f2f2f2] text-sm font-medium mb-1">TV Shows</h4>
+                                    {tvShows.map((show, idx) => (
+                                        <div key={idx} className="py-2">
+                                            <p className="text-white text-sm">{show}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Movies */}
+                            {movies.length > 0 && (
+                                <div className="space-y-1 pt-2">
+                                    <h4 className="text-[#f2f2f2] text-sm font-medium mb-1">Movies</h4>
+                                    {movies.map((movie, idx) => (
+                                        <div key={idx} className="py-2">
+                                            <p className="text-white text-sm">{movie}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Artists/Bands */}
+                            {artistsBands.length > 0 && (
+                                <div className="space-y-1 pt-2">
+                                    <h4 className="text-[#f2f2f2] text-sm font-medium mb-1">Music</h4>
+                                    {artistsBands.map((artist, idx) => (
+                                        <div key={idx} className="py-2">
+                                            <p className="text-white text-sm">{artist}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
 
                 <div className="h-6"></div>
             </div>
         </div>
     );
-}
-
-function calculateAge(dateOfBirth) {
-    if (!dateOfBirth) return '';
-    const today = new Date();
-    const birthDate = new Date(dateOfBirth);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-        age--;
-    }
-    return age;
 }

@@ -175,10 +175,14 @@ export default function HomeTab() {
         setMatchedUser(response.matchData);
         setShowMatchNotification(true);
 
-        // Auto-hide notification after 5 seconds
-        setTimeout(() => {
-          setShowMatchNotification(false);
-        }, 5000);
+        // Create conversation immediately when match occurs
+        // This ensures the match appears in Messages tab regardless of popup action
+        try {
+          await chatAPI.createConversation(response.matchData.userId);
+        } catch (convError) {
+          console.error('Error creating conversation:', convError);
+          // Continue showing popup even if conversation creation fails
+        }
       }
 
       // Move to next candidate
@@ -255,7 +259,7 @@ export default function HomeTab() {
     if (!matchedUser) return;
 
     try {
-      // Create or get conversation with matched user
+      // Get conversation with matched user (already created during match)
       const { conversationId } = await chatAPI.createConversation(matchedUser.userId);
 
       // Navigate to chat conversation

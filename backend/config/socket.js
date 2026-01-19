@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const matchExpiryService = require('../services/matchExpiry');
+const profileLevelService = require('../services/profileLevelService');
 
 // Track online users
 const onlineUsers = new Map();
@@ -34,20 +35,36 @@ const initializeSocketHandlers = (io) => {
     });
     
     // Handle typing indicator
-    socket.on('typing_start', ({ conversationId, otherUserId }) => {
-      io.to(`user:${otherUserId}`).emit('user_typing', {
-        conversationId,
-        userId: socket.userId,
-        isTyping: true
-      });
+    socket.on('typing_start', async ({ conversationId, otherUserId }) => {
+      // Check if blocked before sending typing indicator
+      const [blockCheck] = await pool.execute(
+        `SELECT 1 FROM blocks WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)`,
+        [socket.userId, otherUserId, otherUserId, socket.userId]
+      );
+      
+      if (blockCheck.length === 0) {
+        io.to(`user:${otherUserId}`).emit('user_typing', {
+          conversationId,
+          userId: socket.userId,
+          isTyping: true
+        });
+      }
     });
     
-    socket.on('typing_stop', ({ conversationId, otherUserId }) => {
-      io.to(`user:${otherUserId}`).emit('user_typing', {
-        conversationId,
-        userId: socket.userId,
-        isTyping: false
-      });
+    socket.on('typing_stop', async ({ conversationId, otherUserId }) => {
+      // Check if blocked before sending typing indicator
+      const [blockCheck] = await pool.execute(
+        `SELECT 1 FROM blocks WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)`,
+        [socket.userId, otherUserId, otherUserId, socket.userId]
+      );
+      
+      if (blockCheck.length === 0) {
+        io.to(`user:${otherUserId}`).emit('user_typing', {
+          conversationId,
+          userId: socket.userId,
+          isTyping: false
+        });
+      }
     });
     
     // Handle sending messages via Socket.IO
@@ -84,6 +101,22 @@ const initializeSocketHandlers = (io) => {
             error: 'Access denied to this conversation',
             conversationId 
           });
+          return;
+        }
+        
+        // Determine the other user
+        const conversation = convCheck[0];
+        const otherUserId = conversation.user_id_1 === userId ? conversation.user_id_2 : conversation.user_id_1;
+        
+        // Check if either user has blocked the other
+        const [blockCheck] = await pool.execute(
+          `SELECT 1 FROM blocks WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)`,
+          [userId, otherUserId, otherUserId, userId]
+        );
+        
+        if (blockCheck.length > 0) {
+          // Fail silently - don't send error, just don't process the message
+          console.log(`[BLOCK] User ${userId} tried to message blocked user ${otherUserId} via socket`);
           return;
         }
         
@@ -133,10 +166,6 @@ const initializeSocketHandlers = (io) => {
           }
         };
         
-        // Determine the other user
-        const conversation = convCheck[0];
-        const otherUserId = conversation.user_id_1 === userId ? conversation.user_id_2 : conversation.user_id_1;
-        
         // Check if recipient is online
         const isRecipientOnline = onlineUsers.has(otherUserId);
         console.log(`Recipient ${otherUserId} online status:`, isRecipientOnline, 'Online users:', Array.from(onlineUsers.keys()));
@@ -174,6 +203,10 @@ const initializeSocketHandlers = (io) => {
         
         console.log(`Message ${savedMessage.id} sent from user ${userId} to user ${otherUserId} (status: ${savedMessage.status})`);
         
+        // ✅ Track message count and check for level upgrades
+        const levelUpdate = await profileLevelService.incrementMessageCount(parseInt(conversationId));
+        console.log('[Level Socket] Message count:', levelUpdate.messageCount, 'Threshold:', levelUpdate.threshold);
+        
         // Track first message and replies for match expiry system
         const isFirstMessage = await matchExpiryService.recordFirstMessage(parseInt(conversationId), userId);
         const isReply = await matchExpiryService.recordReply(parseInt(conversationId), userId);
@@ -199,6 +232,29 @@ const initializeSocketHandlers = (io) => {
             conversationId: parseInt(conversationId),
             otherUserId: userId
           });
+        }
+        
+        // ✅ Notify both users if level threshold reached
+        if (levelUpdate.shouldNotify) {
+          // Get partner name for notification
+          const [partnerInfo] = await pool.execute(
+            'SELECT first_name FROM users WHERE id = ?',
+            [otherUserId]
+          );
+          const partnerName = partnerInfo[0]?.first_name || 'Your match';
+          
+          const levelEvent = {
+            conversationId: parseInt(conversationId),
+            threshold: levelUpdate.threshold,
+            messageCount: levelUpdate.messageCount,
+            partnerName
+          };
+          
+          // Emit to both users
+          io.to(`user:${userId}`).emit('level_threshold_reached', levelEvent);
+          io.to(`user:${otherUserId}`).emit('level_threshold_reached', levelEvent);
+          
+          console.log(`[Level Socket] Threshold ${levelUpdate.threshold} reached for conversation ${conversationId}`);
         }
         
       } catch (error) {

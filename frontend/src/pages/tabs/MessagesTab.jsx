@@ -101,12 +101,31 @@ export default function MessagesTab() {
       });
     });
 
+    // Listen for unmatch events to remove conversation
+    socketService.on('conversation_unmatched', ({ conversationId }) => {
+      console.log('Conversation unmatched:', conversationId);
+      setConversations(prev => prev.filter(conv => conv.conversationId !== conversationId));
+    });
+
     return () => {
       socketService.off('new_message');
       socketService.off('match_moved_to_chat');
       socketService.off('messages_read');
       socketService.off('message_delivered');
+      socketService.off('conversation_unmatched');
     };
+  }, []);
+
+  // Reload matches whenever component is visible (e.g., after navigating back from chat)
+  useEffect(() => {
+    const handleFocus = () => {
+      console.log('Window focused, reloading matches...');
+      loadMutualMatches();
+      loadConversations();
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
   const loadConversations = async () => {
@@ -296,7 +315,7 @@ export default function MessagesTab() {
 
               <div className="absolute -bottom-2 flex items-center gap-1 bg-white text-black text-[10px] font-semibold px-2 py-[2px] rounded-full shadow">
                 <Clock size={12} strokeWidth={2} />
-                <span>{daysRemaining}d left</span>
+                <span>{daysRemaining}d</span>
               </div>
             </div>
           </div>
@@ -308,7 +327,7 @@ export default function MessagesTab() {
 
 
       {/* Filter Tabs */}
-      <div className="px-6 mb-4 -mt-2">
+      <div className="px-6 mb-4 -mt-1">
         <div className="flex gap-3">
           {['All', 'Unread'].map((filter) => (
             <button

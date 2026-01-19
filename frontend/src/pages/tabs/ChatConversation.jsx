@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { chatAPI } from '../../utils/api';
 import socketService from '../../utils/socket';
-import EmojiPicker from 'emoji-picker-react';
+import LevelUpPopup from './LevelUpPopup';
+import Level2UnlockedPopup from './Level2UnlockedPopup';
 
 export default function ChatConversation() {
     const navigate = useNavigate();
@@ -18,10 +19,11 @@ export default function ChatConversation() {
     const [recordingTime, setRecordingTime] = useState(0);
     const [selectedMessage, setSelectedMessage] = useState(null);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [recordedAudio, setRecordedAudio] = useState(null);
     const [recordedDuration, setRecordedDuration] = useState(0);
     const [isPlaying, setIsPlaying] = useState(false);
+    const [showUnmatchDialog, setShowUnmatchDialog] = useState(false);
+    const [showBlockDialog, setShowBlockDialog] = useState(false);
     const menuRef = useRef(null);
     const messagesEndRef = useRef(null);
     const typingTimeoutRef = useRef(null);
@@ -29,8 +31,15 @@ export default function ChatConversation() {
     const audioChunksRef = useRef([]);
     const recordingIntervalRef = useRef(null);
     const inputRef = useRef(null);
-    const emojiPickerRef = useRef(null);
     const audioPreviewRef = useRef(null);
+
+    // ✅ Level system state
+    const [levelStatus, setLevelStatus] = useState(null);
+    const [showLevel2Popup, setShowLevel2Popup] = useState(false);
+    const [showLevel3Popup, setShowLevel3Popup] = useState(false);
+    const [showLevel2Unlocked, setShowLevel2Unlocked] = useState(false);
+    const [pendingLevel2Threshold, setPendingLevel2Threshold] = useState(false);
+    const [pendingLevel3Threshold, setPendingLevel3Threshold] = useState(false);
 
     // Normalize message timestamp - ensure createdAt exists
     const normalizeMessage = (msg) => {
@@ -134,6 +143,51 @@ export default function ChatConversation() {
             }
         });
 
+        // Listen for conversation unmatch events
+        socketService.on('conversation_unmatched', ({ conversationId: unmatchedConvId }) => {
+            console.log('Conversation unmatched:', unmatchedConvId);
+            if (unmatchedConvId === conversationId) {
+                // Navigate back to messages tab
+                navigate('/home', { state: { selectedTab: 'chats' } });
+            }
+        });
+
+        // ✅ Listen for level threshold reached
+        socketService.on('level_threshold_reached', ({ conversationId: convId, threshold, partnerName }) => {
+            console.log('[Level] Threshold reached:', threshold, 'in conversation', convId);
+            if (convId === conversationId) {
+                if (threshold === 'LEVEL_2') {
+                    setPendingLevel2Threshold(true);
+                } else if (threshold === 'LEVEL_3') {
+                    setPendingLevel3Threshold(true);
+                }
+                // Reload level status
+                loadLevelStatus();
+            }
+        });
+
+        // ✅ Listen for Level 2 unlocked (both users completed)
+        socketService.on('level2_unlocked', ({ conversationId: convId }) => {
+            console.log('[Level] Level 2 unlocked in conversation', convId);
+            if (convId === conversationId) {
+                setShowLevel2Unlocked(true);
+                setShowLevel2Popup(false);
+                loadLevelStatus();
+            }
+        });
+
+        // ✅ Listen for Level 3 unlocked (both users consented)
+        socketService.on('level3_unlocked', ({ conversationId: convId }) => {
+            console.log('[Level] Level 3 unlocked in conversation', convId);
+            if (convId === conversationId) {
+                setShowLevel3Popup(false);
+                loadLevelStatus();
+            }
+        });
+
+        // ✅ Load initial level status
+        loadLevelStatus();
+
         return () => {
             socketService.leaveConversation(conversationId);
             socketService.off('new_message');
@@ -142,6 +196,10 @@ export default function ChatConversation() {
             socketService.off('message_delivered');
             socketService.off('user_status');
             socketService.off('message_deleted');
+            socketService.off('conversation_unmatched');
+            socketService.off('level_threshold_reached');
+            socketService.off('level2_unlocked');
+            socketService.off('level3_unlocked');
 
             // Cleanup recorded audio if user navigates away
             if (recordedAudio) {
@@ -149,6 +207,20 @@ export default function ChatConversation() {
             }
         };
     }, [conversationId, otherUser, navigate, recordedAudio]);
+
+    // ✅ Reload level status when page becomes visible (e.g., returning from profile questions)
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (!document.hidden) {
+                console.log('[Level] Page visible, reloading status and messages...');
+                loadLevelStatus();
+                loadMessages(); // Also reload messages to ensure we have fresh data
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, [conversationId]);
 
     const loadMessages = async () => {
         try {
@@ -172,6 +244,113 @@ export default function ChatConversation() {
         }
     };
 
+    // ✅ Load level status for this conversation
+    const loadLevelStatus = async () => {
+        try {
+            const status = await chatAPI.getLevelStatus(conversationId);
+            setLevelStatus(status);
+            console.log('[Level] Status loaded:', status);
+            
+            // ✅ CRITICAL: Do NOT show popups here!
+            // Popups should ONLY be triggered by level_threshold_reached socket event
+            // This function is called when returning from profile-questions or when page becomes visible
+            // Showing popups here would cause them to appear incorrectly
+        } catch (error) {
+            console.error('[Level] Failed to load status:', error);
+        }
+    };
+
+    // ✅ Check and show Level 2 popup when threshold reached
+    useEffect(() => {
+        if (pendingLevel2Threshold && levelStatus) {
+            // ✅ CRITICAL: Only show popup if backend says action is needed
+            const action = levelStatus.level2Action;
+            console.log('[Level2] Threshold reached, action:', action);
+            
+            if (action === 'FILL_INFORMATION' || action === 'ASK_CONSENT') {
+                setShowLevel2Popup(true);
+            }
+        }
+    }, [pendingLevel2Threshold, levelStatus]);
+
+    // ✅ Check and show Level 3 popup when threshold reached
+    useEffect(() => {
+        if (pendingLevel3Threshold && levelStatus) {
+            // ✅ CRITICAL: Only show popup if backend says action is needed
+            const action = levelStatus.level3Action;
+            console.log('[Level3] Threshold reached, action:', action);
+            
+            if (action === 'FILL_INFORMATION' || action === 'ASK_CONSENT') {
+                setShowLevel3Popup(true);
+            }
+        }
+    }, [pendingLevel3Threshold, levelStatus]);
+
+    // ✅ Handle Level 2 popup - redirect to questions based on action
+    const handleLevel2FillInfo = () => {
+        const action = levelStatus?.level2Action;
+        console.log('[Level2] Fill Info clicked, action:', action);
+        
+        // ✅ CRITICAL: Frontend ONLY redirects if backend says FILL_INFORMATION
+        if (action === 'FILL_INFORMATION') {
+            console.log('[Level2] Action is FILL_INFORMATION - navigating to profile-questions');
+            navigate('/profile-questions', { 
+                state: { 
+                    levelOnly: 2,
+                    returnTo: '/home',
+                    returnState: { 
+                        selectedTab: 'chats',
+                        openConversation: { conversationId, otherUser }
+                    }
+                } 
+            });
+        } else {
+            console.error('[Level2] Invalid action for Fill Info button:', action);
+        }
+    };
+
+    // ✅ Handle Level 2 consent - YES
+    const handleLevel2Yes = async () => {
+        try {
+            await chatAPI.setLevel2Consent(conversationId, true);
+            setShowLevel2Popup(false);
+            loadLevelStatus();
+        } catch (error) {
+            console.error('[Level] Failed to set Level 2 consent:', error);
+        }
+    };
+
+    // ✅ Handle Level 2 consent - NO  
+    const handleLevel2No = () => {
+        // Keep popup visible, user can change mind later
+        setShowLevel2Popup(false);
+    };
+
+    // ✅ Handle Level 3 popup - redirect to questions OR show consent
+    const handleLevel3FillInfo = () => {
+        // Level 3 questions don't exist yet (face photos feature missing)
+        // For now, just auto-consent
+        handleLevel3Yes();
+    };
+
+    // ✅ Handle Level 3 consent - YES
+    const handleLevel3Yes = async () => {
+        try {
+            await chatAPI.setLevel3Consent(conversationId, true);
+            setShowLevel3Popup(false);
+            loadLevelStatus();
+        } catch (error) {
+            console.error('[Level] Failed to set Level 3 consent:', error);
+        }
+    };
+
+    // ✅ Handle Level 3 consent - NO
+    const handleLevel3No = () => {
+        // Keep popup visible, user can change mind later
+        // Do not set consent to false, just dismiss UI
+        setShowLevel3Popup(false);
+    };
+
     const scrollToBottom = () => {
         setTimeout(() => {
             messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -183,7 +362,6 @@ export default function ChatConversation() {
 
         const textToSend = message.trim();
         setMessage('');
-        setShowEmojiPicker(false);
 
         // Stop typing indicator
         socketService.stopTyping(conversationId, otherUser.id);
@@ -438,7 +616,7 @@ export default function ChatConversation() {
         setShowDeleteDialog(true);
     };
 
-    const handleDeleteMessage = async (deleteType) => {
+    const handleUnsendMessage = async () => {
         if (!selectedMessage) return;
 
         try {
@@ -449,14 +627,59 @@ export default function ChatConversation() {
             setShowDeleteDialog(false);
             setSelectedMessage(null);
 
-            // Call API in background
-            await chatAPI.deleteMessage(messageIdToDelete, deleteType);
-            console.log('Message deleted successfully:', messageIdToDelete, 'deleteType:', deleteType);
+            // Call API to unsend (delete for everyone)
+            await chatAPI.deleteMessage(messageIdToDelete);
+            console.log('Message unsent successfully:', messageIdToDelete);
         } catch (error) {
-            console.error('Failed to delete message:', error);
-            alert('Failed to delete message. Please try again.');
+            console.error('Failed to unsend message:', error);
+            alert(error.message || 'Failed to unsend message. Please try again.');
             // Reload messages on error
             loadMessages();
+        }
+    };
+
+    const canUnsendMessage = (msg) => {
+        if (!msg || !msg.isSent) return false;
+        
+        // Check if message is within 12 hours
+        const messageTime = new Date(msg.createdAt).getTime();
+        const now = Date.now();
+        const twelveHours = 12 * 60 * 60 * 1000;
+        
+        return (now - messageTime) <= twelveHours;
+    };
+
+    const handleBlock = async () => {
+        try {
+            setShowBlockDialog(false);
+            setShowMenu(false);
+            
+            // Call API to block user (also unmatches and deletes conversation)
+            await chatAPI.blockUser(conversationId);
+            console.log('User blocked successfully');
+            
+            // Navigate back to messages tab immediately
+            navigate('/home', { state: { selectedTab: 'chats' } });
+        } catch (error) {
+            console.error('Failed to block user:', error);
+            alert('Failed to block user. Please try again.');
+        }
+    };
+
+    const handleUnmatch = async () => {
+        try {
+            setShowUnmatchDialog(false);
+            setShowMenu(false);
+            
+            // Call API to unmatch (notifies both users)
+            await chatAPI.unmatch(conversationId);
+            console.log('Unmatched successfully');
+            
+            // Navigate back to messages tab
+            navigate('/home', { state: { selectedTab: 'chats' } });
+        } catch (error) {
+            console.error('Failed to unmatch:', error);
+            alert('Failed to unmatch. Please try again.');
         }
     };
 
@@ -485,44 +708,18 @@ export default function ChatConversation() {
             if (menuRef.current && !menuRef.current.contains(event.target)) {
                 setShowMenu(false);
             }
-            if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target)) {
-                setShowEmojiPicker(false);
-            }
         };
 
-        if (showMenu || showEmojiPicker) {
+        if (showMenu) {
             document.addEventListener('mousedown', handleClickOutside);
         }
 
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [showMenu, showEmojiPicker]);
+    }, [showMenu]);
 
-    const handleEmojiClick = (emojiObject) => {
-        const emoji = emojiObject.emoji;
-        const input = inputRef.current;
 
-        if (input) {
-            const start = input.selectionStart;
-            const end = input.selectionEnd;
-            const text = message;
-            const before = text.substring(0, start);
-            const after = text.substring(end);
-            const newText = before + emoji + after;
-
-            setMessage(newText);
-
-            // Set cursor position after emoji
-            setTimeout(() => {
-                input.selectionStart = input.selectionEnd = start + emoji.length;
-                input.focus();
-            }, 0);
-        } else {
-            // Fallback: append to end
-            setMessage(prev => prev + emoji);
-        }
-    };
 
     return (
         <div
@@ -549,7 +746,7 @@ export default function ChatConversation() {
                             onClick={() => navigate('/user-profile-info', {
                                 state: {
                                     userId: otherUser?.id,
-                                    otherUser: otherUser
+                                    conversationId: conversationId
                                 }
                             })}
                             className="flex-shrink-0"
@@ -565,7 +762,7 @@ export default function ChatConversation() {
                             onClick={() => navigate('/user-profile-info', {
                                 state: {
                                     userId: otherUser?.id,
-                                    otherUser: otherUser
+                                    conversationId: conversationId
                                 }
                             })}
                             className="flex-1 text-left"
@@ -597,50 +794,47 @@ export default function ChatConversation() {
                         {showMenu && (
                             <div className="absolute right-0 top-12 w-56 bg-white backdrop-blur-xl rounded-2xl shadow-lg overflow-hidden z-[60]">
                                 <button
-                                    onClick={() => setShowMenu(false)}
-                                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-black/5 transition-colors text-left"
+                                    onClick={() => {
+                                        setShowMenu(false);
+                                        // Report is not implemented yet - show coming soon or do nothing
+                                    }}
+                                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-black/5 transition-colors text-left opacity-50 cursor-not-allowed"
+                                    disabled
                                 >
-                                    <span className="text-gray-800 font-medium">Mute</span>
+                                    <span className="text-gray-800 font-medium">Report</span>
                                     <svg className="w-5 h-5 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                     </svg>
                                 </button>
 
                                 <div className="h-px bg-gray-300" />
 
                                 <button
-                                    onClick={() => setShowMenu(false)}
-                                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-black/5 transition-colors text-left"
+                                    onClick={() => {
+                                        setShowMenu(false);
+                                        setShowBlockDialog(true);
+                                    }}
+                                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-red-50 transition-colors text-left"
                                 >
-                                    <span className="text-gray-800 font-medium">Clear chat</span>
-                                    <svg className="w-5 h-5 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    <span className="text-red-500 font-medium">Block</span>
+                                    <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                                     </svg>
                                 </button>
 
                                 <div className="h-px bg-gray-300" />
 
                                 <button
-                                    onClick={() => setShowMenu(false)}
+                                    onClick={() => {
+                                        setShowMenu(false);
+                                        setShowUnmatchDialog(true);
+                                    }}
                                     className="w-full px-4 py-3 flex items-center justify-between hover:bg-black/5 transition-colors text-left"
                                 >
                                     <span className="text-gray-800 font-medium">Unmatch</span>
                                     <svg className="w-5 h-5 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6" />
-                                    </svg>
-                                </button>
-
-                                <div className="h-px bg-gray-300" />
-
-                                <button
-                                    onClick={() => setShowMenu(false)}
-                                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-red-50 transition-colors text-left"
-                                >
-                                    <span className="text-red-500 font-medium">Delete</span>
-                                    <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                     </svg>
                                 </button>
                             </div>
@@ -745,21 +939,32 @@ export default function ChatConversation() {
 
             {/* Input Area */}
             <div className="bg-gradient-to-t from-black/60 to-transparent px-4 py-4 pb-8 z-10 relative">
-                {/* Emoji Picker */}
-                {showEmojiPicker && !isRecording && !recordedAudio && (
-                    <div ref={emojiPickerRef} className="absolute bottom-24 left-4 right-4 z-[15]">
-                        <EmojiPicker
-                            onEmojiClick={handleEmojiClick}
-                            width="100%"
-                            height="350px"
-                            theme="light"
-                            searchDisabled={false}
-                            skinTonesDisabled={false}
-                            previewConfig={{ showPreview: false }}
-                        />
-                    </div>
-                )}
-
+                {/* ✅ Level Up Popups */}
+                <LevelUpPopup
+                    show={showLevel2Popup}
+                    type="LEVEL_2"
+                    action={levelStatus?.level2Action}
+                    partnerName={otherUser?.firstName || otherUser?.name || 'Your match'}
+                    onFillInfo={handleLevel2FillInfo}
+                    onYes={handleLevel2Yes}
+                    onNo={handleLevel2No}
+                />
+                
+                <LevelUpPopup
+                    show={showLevel3Popup}
+                    type="LEVEL_3"
+                    action={levelStatus?.level3Action}
+                    partnerName={otherUser?.firstName || otherUser?.name || 'Your match'}
+                    onFillInfo={handleLevel3FillInfo}
+                    onYes={handleLevel3Yes}
+                    onNo={handleLevel3No}
+                />
+                
+                <Level2UnlockedPopup
+                    show={showLevel2Unlocked}
+                    onDismiss={() => setShowLevel2Unlocked(false)}
+                />
+                
                 <div className="flex items-center gap-2">
                     {/* Voice Preview Mode - WhatsApp style */}
                     {recordedAudio ? (
@@ -897,7 +1102,7 @@ export default function ChatConversation() {
                                 />
                                 <button
                                     type="button"
-                                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                                    onClick={() => inputRef.current?.focus()}
                                     className="ml-2"
                                 >
                                     <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -907,15 +1112,38 @@ export default function ChatConversation() {
                             </div>
 
                             {message.trim() ? (
-                                <button
-                                    type="button"
-                                    onClick={handleSendMessage}
-                                    className="w-10 h-10 bg-white rounded-full flex items-center justify-center flex-shrink-0"
-                                >
-                                    <svg className="w-5 h-5 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                                    </svg>
-                                </button>
+                              <button
+  type="button"
+  onClick={handleSendMessage}
+  className="w-10 h-10 bg-white rounded-full flex items-center justify-center flex-shrink-0"
+>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="18"
+    height="18"
+    viewBox="0 0 18 18"
+    fill="none"
+  >
+    <path
+      d="M17.5158 2.01275C17.9478 0.81775 16.7898 -0.34025 15.5948 0.0927503L0.989804 5.37475C-0.209196 5.80875 -0.354196 7.44475 0.748804 8.08375L5.4108 10.7828L9.5738 6.61975C9.76241 6.43759 10.015 6.3368 10.2772 6.33908C10.5394 6.34135 10.7902 6.44652 10.9756 6.63193C11.161 6.81734 11.2662 7.06815 11.2685 7.33035C11.2708 7.59255 11.17 7.84515 10.9878 8.03375L6.8248 12.1968L9.5248 16.8587C10.1628 17.9618 11.7988 17.8158 12.2328 16.6178L17.5158 2.01275Z"
+      fill="url(#paint0_linear_3584_5867)"
+    />
+    <defs>
+      <linearGradient
+        id="paint0_linear_3584_5867"
+        x1="8.80409"
+        y1="0"
+        x2="8.80409"
+        y2="17.6072"
+        gradientUnits="userSpaceOnUse"
+      >
+        <stop stopColor="#DD9200" />
+        <stop offset="1" stopColor="#F9C900" />
+      </linearGradient>
+    </defs>
+  </svg>
+</button>
+
                             ) : (
                                 <button
                                     type="button"
@@ -930,38 +1158,90 @@ export default function ChatConversation() {
                 </div>
             </div>
 
-            {/* Delete Message Dialog */}
+            {/* Unsend Message Dialog */}
             {showDeleteDialog && selectedMessage && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[45] px-4">
                     <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden">
                         <div className="p-6">
-                            <h3 className="text-xl font-semibold text-gray-800 mb-2">Delete message?</h3>
+                            <h3 className="text-xl font-semibold text-gray-800 mb-2">Unsend message?</h3>
                             <p className="text-gray-600 text-sm mb-6">
-                                {selectedMessage.isSent
-                                    ? 'Choose who you want to delete this message for'
-                                    : 'This message will be deleted for you only'}
+                                {canUnsendMessage(selectedMessage)
+                                    ? 'This message will be removed for both you and the recipient.'
+                                    : 'Messages can only be unsent within 12 hours of sending.'}
                             </p>
 
                             <div className="space-y-3">
-                                {selectedMessage.isSent && (
+                                {canUnsendMessage(selectedMessage) && (
                                     <button
-                                        onClick={() => handleDeleteMessage('for_everyone')}
+                                        onClick={handleUnsendMessage}
                                         className="w-full py-3 px-4 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-colors"
                                     >
-                                        Delete for everyone
+                                        Unsend
                                     </button>
                                 )}
-                                <button
-                                    onClick={() => handleDeleteMessage('for_me')}
-                                    className="w-full py-3 px-4 bg-gray-200 text-gray-800 rounded-xl font-medium hover:bg-gray-300 transition-colors"
-                                >
-                                    Delete for me
-                                </button>
                                 <button
                                     onClick={() => {
                                         setShowDeleteDialog(false);
                                         setSelectedMessage(null);
                                     }}
+                                    className="w-full py-3 px-4 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Block Dialog */}
+            {showBlockDialog && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[45] px-4">
+                    <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-800 mb-2">Block {otherUser?.firstName || otherUser?.name}?</h3>
+                            <p className="text-gray-600 text-sm mb-6">
+                                Blocked users won't be able to message you. This will also remove your match and conversation. This action cannot be undone.
+                            </p>
+
+                            <div className="space-y-3">
+                                <button
+                                    onClick={handleBlock}
+                                    className="w-full py-3 px-4 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-colors"
+                                >
+                                    Block
+                                </button>
+                                <button
+                                    onClick={() => setShowBlockDialog(false)}
+                                    className="w-full py-3 px-4 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Unmatch Dialog */}
+            {showUnmatchDialog && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[45] px-4">
+                    <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-800 mb-2">Unmatch with {otherUser?.firstName || otherUser?.name}?</h3>
+                            <p className="text-gray-600 text-sm mb-6">
+                                This will remove your match and delete all messages for both of you. This action cannot be undone.
+                            </p>
+
+                            <div className="space-y-3">
+                                <button
+                                    onClick={handleUnmatch}
+                                    className="w-full py-3 px-4 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-colors"
+                                >
+                                    Unmatch
+                                </button>
+                                <button
+                                    onClick={() => setShowUnmatchDialog(false)}
                                     className="w-full py-3 px-4 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200 transition-colors"
                                 >
                                     Cancel

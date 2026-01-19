@@ -2,6 +2,7 @@ const express = require('express');
 const pool = require('../config/db');
 const auth = require('../middleware/auth');
 const matchExpiryService = require('../services/matchExpiry');
+const profileLevelService = require('../services/profileLevelService');
 const router = express.Router();
 
 // Helper function to safely parse JSON
@@ -89,6 +90,135 @@ router.get('/profile', auth, async (req, res) => {
         
     } catch (error) {
         console.error('Get profile error:', error);
+        res.status(500).json({ error: 'Internal server error: ' + error.message });
+    }
+});
+
+// Get another user's profile by ID (for viewing matched users, etc.)
+router.get('/profile/:userId', auth, async (req, res) => {
+    try {
+        if (!(await validateConnection())) {
+            return res.status(500).json({ error: 'Database connection failed' });
+        }
+
+        const targetUserId = parseInt(req.params.userId);
+        if (isNaN(targetUserId)) {
+            return res.status(400).json({ error: 'Invalid user ID' });
+        }
+
+        // ✅ NEW: Check if conversationId is provided for level-based filtering
+        const { conversationId } = req.query;
+
+        // Fetch complete user profile from users table (authoritative source)
+        const [users] = await pool.execute(
+            `SELECT id, first_name, last_name, gender, dob, current_location, 
+                    favourite_travel_destination, last_holiday_places, favourite_places_to_go, 
+                    profile_pic_url, intent, interests, pets, drinking, smoking, height, 
+                    religious_level, kids_preference, food_preference, relationship_status, 
+                    from_location, instagram, linkedin, face_photos 
+             FROM users 
+             WHERE id = ? AND approval = true`,
+            [targetUserId]
+        );
+        
+        if (users.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        
+        const user = users[0];
+        
+        // Calculate age
+        let age = null;
+        if (user.dob) {
+            const birthDate = new Date(user.dob);
+            const today = new Date();
+            age = today.getFullYear() - birthDate.getFullYear();
+            const m = today.getMonth() - birthDate.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                age--;
+            }
+        }
+        
+        // Build complete profile data
+        const profileData = {
+            id: user.id,
+            firstName: user.first_name || null,
+            lastName: user.last_name || null,
+            name: `${user.first_name || ''} ${user.last_name || ''}`.trim(),
+            gender: user.gender || null,
+            age: age,
+            dob: user.dob || null,
+            currentLocation: user.current_location || null,
+            location: user.current_location || null,
+            favouriteTravelDestination: user.favourite_travel_destination || null,
+            lastHolidayPlaces: safeJsonParse(user.last_holiday_places, []),
+            favouritePlacesToGo: safeJsonParse(user.favourite_places_to_go, []),
+            profilePicUrl: user.profile_pic_url || null,
+            intent: safeJsonParse(user.intent, {}),
+            interests: safeJsonParse(user.interests, []),
+            pets: user.pets || null,
+            drinking: user.drinking || null,
+            smoking: user.smoking || null,
+            height: user.height || null,
+            religiousLevel: user.religious_level || null,
+            kidsPreference: user.kids_preference || null,
+            foodPreference: user.food_preference || null,
+            relationshipStatus: user.relationship_status || null,
+            fromLocation: user.from_location || null,
+            instagram: user.instagram || null,
+            linkedin: user.linkedin || null,
+            facePhotos: safeJsonParse(user.face_photos, []),
+        };
+        
+        // ✅ NEW: If conversationId provided, filter by visibility level
+        if (conversationId) {
+            const convId = parseInt(conversationId);
+            if (!isNaN(convId)) {
+                try {
+                    // Get visibility level
+                    const visibility = await profileLevelService.getVisibilityLevel(
+                        convId, 
+                        req.user.userId, 
+                        targetUserId
+                    );
+                    
+                    console.log(`[Profile Filter] User ${req.user.userId} viewing ${targetUserId} in conv ${convId}`, {
+                        level: visibility.level,
+                        canUpgrade: visibility.canUpgrade,
+                        nextLevelAt: visibility.nextLevelAt
+                    });
+                    
+                    // Filter profile based on level
+                    const filteredProfile = profileLevelService.filterProfileByLevel(profileData, visibility.level);
+                    
+                    console.log('[Profile Filter] Filtered fields:', Object.keys(filteredProfile));
+                    console.log('[Profile Filter] Level 2 fields present:', {
+                        pets: filteredProfile.pets,
+                        drinking: filteredProfile.drinking,
+                        smoking: filteredProfile.smoking,
+                        height: filteredProfile.height,
+                        foodPreference: filteredProfile.foodPreference,
+                        religiousLevel: filteredProfile.religiousLevel
+                    });
+                    
+                    // Add visibility metadata
+                    filteredProfile.visibilityLevel = visibility.level;
+                    filteredProfile.canUpgrade = visibility.canUpgrade;
+                    filteredProfile.nextLevelAt = visibility.nextLevelAt;
+                    
+                    return res.json(filteredProfile);
+                } catch (levelError) {
+                    console.error('Level filtering error:', levelError);
+                    // Fall through to return full profile if filtering fails
+                }
+            }
+        }
+        
+        // Return complete profile (for Discover tab or if filtering failed)
+        res.json(profileData);
+        
+    } catch (error) {
+        console.error('Get user profile by ID error:', error);
         res.status(500).json({ error: 'Internal server error: ' + error.message });
     }
 });
@@ -230,6 +360,15 @@ router.put('/profile', auth, async (req, res) => {
             WHERE id = ?`,
             updateData 
         );
+
+        // ✅ Mark Level 3 completed if face photos are provided
+        if (facePhotos !== undefined && Array.isArray(facePhotos) && facePhotos.length >= 4) {
+            await pool.execute(
+                'UPDATE users SET level3_questions_completed = TRUE WHERE id = ?',
+                [req.user.userId]
+            );
+            console.log(`[Level 3] Marked as completed for user ${req.user.userId} (uploaded ${facePhotos.length} face photos)`);
+        }
         
         res.json({ message: 'Profile updated successfully' });
         
@@ -347,6 +486,7 @@ router.get('/matches/potential', auth, async (req, res) => {
         console.log('[DEBUG] Query params:', queryParams);
 
         // Get potential matches using dob BETWEEN (no YEAR function, no ORDER BY RAND)
+        // Exclude blocked users (both users who blocked current user and users blocked by current user)
         const [users] = await pool.execute(
             `SELECT id, email, first_name, last_name, gender, dob, current_location, 
                     favourite_travel_destination, profile_pic_url, intent, 
@@ -361,8 +501,13 @@ router.get('/matches/potential', auth, async (req, res) => {
                 AND CAST(dob AS CHAR) != '0000-00-00'
                 AND dob BETWEEN ? AND ?
                 ${genderClause}
+                AND NOT EXISTS (
+                  SELECT 1 FROM blocks b 
+                  WHERE (b.blocker_id = ? AND b.blocked_id = users.id)
+                     OR (b.blocker_id = users.id AND b.blocked_id = ?)
+                )
              LIMIT 20`,
-            queryParams
+            [...queryParams, userId, userId]
         );
 
         console.log('[DEBUG] Found users:', users.length, users.length > 0 ? users.map(u => ({ id: u.id, gender: u.gender, firstName: u.first_name })) : 'No users found');
@@ -514,7 +659,7 @@ router.get('/matches/mutual', auth, async (req, res) => {
 
         const userId = req.user.userId;
 
-        // Get all mutual matches using the view or direct query
+        // Get all mutual matches, excluding blocked users
         const [matches] = await pool.execute(
             `SELECT DISTINCT
                 u.id, u.email, u.first_name, u.last_name, u.gender, u.dob, 
@@ -529,8 +674,13 @@ router.get('/matches/mutual', auth, async (req, res) => {
              WHERE a1.user_id = ? 
                 AND a1.action_type = 'like' 
                 AND a2.action_type = 'like'
+                AND NOT EXISTS (
+                  SELECT 1 FROM blocks b 
+                  WHERE (b.blocker_id = ? AND b.blocked_id = u.id)
+                     OR (b.blocker_id = u.id AND b.blocked_id = ?)
+                )
              ORDER BY a2.created_at DESC`,
-            [userId]
+            [userId, userId, userId]
         );
 
         // Parse JSON fields and calculate age

@@ -81,16 +81,115 @@ export const chatAPI = {
         });
     },
 
-    // Delete message
-    deleteMessage: async (messageId, deleteType) => {
+    // Unsend message (deletes for both users, within 12 hours)
+    deleteMessage: async (messageId) => {
         if (isMockMode()) {
-            console.log("MOCK MODE: Simulating message delete.");
-            return { success: true, deleteType };
+            console.log("MOCK MODE: Simulating message unsend.");
+            return { success: true };
         }
         
         return authRequest(`/chat/messages/${messageId}`, {
             method: 'DELETE',
-            body: JSON.stringify({ deleteType }),
+        });
+    },
+
+    // Block user - One-sided block that also removes match and conversation
+    blockUser: async (conversationId) => {
+        if (isMockMode()) {
+            console.log("MOCK MODE: Simulating block user.");
+            return { success: true };
+        }
+        
+        return authRequest(`/chat/conversations/${conversationId}/block`, {
+            method: 'POST',
+        });
+    },
+
+    // Unmatch - Remove match and delete conversation for both users
+    unmatch: async (conversationId) => {
+        if (isMockMode()) {
+            console.log("MOCK MODE: Simulating unmatch.");
+            return { success: true };
+        }
+        
+        return authRequest(`/chat/conversations/${conversationId}/unmatch`, {
+            method: 'DELETE',
+        });
+    },
+
+    // Delete conversation - Remove from current user's view only
+    deleteConversation: async (conversationId) => {
+        if (isMockMode()) {
+            console.log("MOCK MODE: Simulating delete conversation.");
+            return { success: true };
+        }
+        
+        return authRequest(`/chat/conversations/${conversationId}`, {
+            method: 'DELETE',
+        });
+    },
+
+    // ✅ Get level status for conversation
+    getLevelStatus: async (conversationId) => {
+        if (isMockMode()) {
+            console.log("MOCK MODE: Simulating level status.");
+            return {
+                messageCount: 0,
+                currentLevel: 1,
+                level2ThresholdReached: false,
+                level2UserCompleted: false,
+                level2PartnerCompleted: false,
+                level2BothCompleted: false,
+                level2Visible: false,
+                level3ThresholdReached: false,
+                level3UserConsent: false,
+                level3PartnerConsent: false,
+                level3BothConsent: false,
+                level3Visible: false,
+                partnerName: 'Mock User'
+            };
+        }
+        
+        return authRequest(`/chat/conversations/${conversationId}/level-status`, {
+            method: 'GET',
+        });
+    },
+
+    // ✅ Mark Level 2 as completed
+    completeLevel2: async (conversationId) => {
+        if (isMockMode()) {
+            console.log("MOCK MODE: Simulating Level 2 completion.");
+            return { bothCompleted: true };
+        }
+        
+        return authRequest(`/chat/conversations/${conversationId}/complete-level2`, {
+            method: 'POST',
+        });
+    },
+
+    // ✅ Set Level 2 consent
+    setLevel2Consent: async (conversationId, consent) => {
+        if (isMockMode()) {
+            console.log("MOCK MODE: Simulating Level 2 consent.");
+            return { bothConsented: consent };
+        }
+        
+        return authRequest(`/chat/conversations/${conversationId}/set-level2-consent`, {
+            method: 'POST',
+            body: JSON.stringify({ consent }),
+        });
+    },
+
+    // ✅ Set Level 3 consent
+    setLevel3Consent: async (conversationId, consent) => {
+        if (isMockMode()) {
+            console.log("MOCK MODE: Simulating Level 3 consent.");
+            return { bothConsented: consent };
+        }
+        
+        return authRequest(`/chat/conversations/${conversationId}/set-level3-consent`, {
+            method: 'POST',
+            body: JSON.stringify({ consent }),
         });
     },
 };
