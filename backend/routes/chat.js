@@ -879,8 +879,9 @@ router.post('/conversations/:conversationId/complete-level2', auth, async (req, 
     
     const bothCompleted = await profileLevelService.markLevel2Completed(convId, userId);
     
-    // ✅ Also set Level 2 consent when completing questions (first time)
-    await profileLevelService.setLevel2Consent(convId, userId, true);
+    // ❌ REMOVED: Do NOT auto-consent when completing questions
+    // Users must explicitly click "Yes" or "No" on the consent popup
+    // await profileLevelService.setLevel2Consent(convId, userId, true);
     
     const io = req.app.get('io');
     

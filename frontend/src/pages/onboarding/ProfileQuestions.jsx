@@ -204,15 +204,22 @@ export default function ProfileQuestions() {
             });
             
             // If this is a level 2 only flow, mark it as complete and navigate back
-            if (levelOnly === 2 && returnState?.openConversation?.conversationId) {
+            console.log('[ProfileQuestions] Checking level flow:', { levelOnly, returnState, returnTo });
+            if (levelOnly === 2 && returnState?.conversationId) {
                 try {
-                    await chatAPI.completeLevel2(returnState.openConversation.conversationId);
-                    console.log('[Level 2] Marked as complete for conversation', returnState.openConversation.conversationId);
+                    await chatAPI.completeLevel2(returnState.conversationId);
+                    console.log('[Level 2] Marked as complete for conversation', returnState.conversationId);
+                    // Navigate back to the specific chat conversation
+                    console.log('[Level 2] Navigating to:', returnTo, 'with state:', returnState);
+                    navigate(returnTo || '/home', { state: returnState });
                 } catch (err) {
                     console.error('[Level 2] Failed to mark complete:', err);
+                    alert('Your answers were saved, but there was an error updating your conversation. Please try reopening the chat.');
+                    // Still navigate back - user data is saved, just the conversation flag might not be set
+                    navigate(returnTo || '/home', { state: returnState });
                 }
-                navigate(returnTo || '/home', { state: returnState });
             } else {
+                console.log('[ProfileQuestions] Not a Level 2 flow, going to profile-photos');
                 navigate('/profile-photos');
             }
         } catch (err) {

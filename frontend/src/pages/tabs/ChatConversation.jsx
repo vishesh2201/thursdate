@@ -35,11 +35,12 @@ export default function ChatConversation() {
 
     // ✅ Level system state
     const [levelStatus, setLevelStatus] = useState(null);
-    const [showLevel2Popup, setShowLevel2Popup] = useState(false);
-    const [showLevel3Popup, setShowLevel3Popup] = useState(false);
     const [showLevel2Unlocked, setShowLevel2Unlocked] = useState(false);
-    const [pendingLevel2Threshold, setPendingLevel2Threshold] = useState(false);
-    const [pendingLevel3Threshold, setPendingLevel3Threshold] = useState(false);
+    // ❌ REMOVED: Frontend local state for popups - now driven entirely by backend
+    // const [showLevel2Popup, setShowLevel2Popup] = useState(false);
+    // const [showLevel3Popup, setShowLevel3Popup] = useState(false);
+    // const [pendingLevel2Threshold, setPendingLevel2Threshold] = useState(false);
+    // const [pendingLevel3Threshold, setPendingLevel3Threshold] = useState(false);
 
     // Normalize message timestamp - ensure createdAt exists
     const normalizeMessage = (msg) => {
@@ -153,15 +154,11 @@ export default function ChatConversation() {
         });
 
         // ✅ Listen for level threshold reached
-        socketService.on('level_threshold_reached', ({ conversationId: convId, threshold, partnerName }) => {
+        socketService.on('level_threshold_reached', ({ conversationId: convId, threshold }) => {
             console.log('[Level] Threshold reached:', threshold, 'in conversation', convId);
             if (convId === conversationId) {
-                if (threshold === 'LEVEL_2') {
-                    setPendingLevel2Threshold(true);
-                } else if (threshold === 'LEVEL_3') {
-                    setPendingLevel3Threshold(true);
-                }
-                // Reload level status
+                // ✅ Just reload status - popup visibility is driven by backend's popupPending flags
+                console.log('[Level] Threshold reached for this conversation, reloading status...');
                 loadLevelStatus();
             }
         });
@@ -171,7 +168,7 @@ export default function ChatConversation() {
             console.log('[Level] Level 2 unlocked in conversation', convId);
             if (convId === conversationId) {
                 setShowLevel2Unlocked(true);
-                setShowLevel2Popup(false);
+                // ✅ Reload status to clear popup flags
                 loadLevelStatus();
             }
         });
@@ -180,7 +177,7 @@ export default function ChatConversation() {
         socketService.on('level3_unlocked', ({ conversationId: convId }) => {
             console.log('[Level] Level 3 unlocked in conversation', convId);
             if (convId === conversationId) {
-                setShowLevel3Popup(false);
+                // ✅ Reload status to clear popup flags
                 loadLevelStatus();
             }
         });
@@ -206,6 +203,7 @@ export default function ChatConversation() {
                 URL.revokeObjectURL(recordedAudio.url);
             }
         };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [conversationId, otherUser, navigate, recordedAudio]);
 
     // ✅ Reload level status when page becomes visible (e.g., returning from profile questions)
@@ -220,6 +218,7 @@ export default function ChatConversation() {
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [conversationId]);
 
     const loadMessages = async () => {
@@ -248,43 +247,20 @@ export default function ChatConversation() {
     const loadLevelStatus = async () => {
         try {
             const status = await chatAPI.getLevelStatus(conversationId);
+            console.log('[Level] Loaded status:', status);
+            console.log('[Level] level2PopupPending =', status?.level2PopupPending);
+            console.log('[Level] level2Action =', status?.level2Action);
+            console.log('[Level] level3PopupPending =', status?.level3PopupPending);
             setLevelStatus(status);
             console.log('[Level] Status loaded:', status);
-            
-            // ✅ CRITICAL: Do NOT show popups here!
-            // Popups should ONLY be triggered by level_threshold_reached socket event
-            // This function is called when returning from profile-questions or when page becomes visible
-            // Showing popups here would cause them to appear incorrectly
+            console.log('[Level] Popup pending - Level 2:', status?.level2PopupPending, 'Level 3:', status?.level3PopupPending);
         } catch (error) {
             console.error('[Level] Failed to load status:', error);
         }
     };
 
-    // ✅ Check and show Level 2 popup when threshold reached
-    useEffect(() => {
-        if (pendingLevel2Threshold && levelStatus) {
-            // ✅ CRITICAL: Only show popup if backend says action is needed
-            const action = levelStatus.level2Action;
-            console.log('[Level2] Threshold reached, action:', action);
-            
-            if (action === 'FILL_INFORMATION' || action === 'ASK_CONSENT') {
-                setShowLevel2Popup(true);
-            }
-        }
-    }, [pendingLevel2Threshold, levelStatus]);
-
-    // ✅ Check and show Level 3 popup when threshold reached
-    useEffect(() => {
-        if (pendingLevel3Threshold && levelStatus) {
-            // ✅ CRITICAL: Only show popup if backend says action is needed
-            const action = levelStatus.level3Action;
-            console.log('[Level3] Threshold reached, action:', action);
-            
-            if (action === 'FILL_INFORMATION' || action === 'ASK_CONSENT') {
-                setShowLevel3Popup(true);
-            }
-        }
-    }, [pendingLevel3Threshold, levelStatus]);
+    // ✅ REMOVED: Old useEffects that triggered popups based on local state
+    // Popups are now driven directly by backend's popupPending flags in levelStatus
 
     // ✅ Handle Level 2 popup - redirect to questions based on action
     const handleLevel2FillInfo = () => {
@@ -297,15 +273,16 @@ export default function ChatConversation() {
             navigate('/profile-questions', { 
                 state: { 
                     levelOnly: 2,
-                    returnTo: '/home',
+                    returnTo: '/chat-conversation',
                     returnState: { 
-                        selectedTab: 'chats',
-                        openConversation: { conversationId, otherUser }
+                        conversationId, 
+                        otherUser
                     }
                 } 
             });
         } else {
             console.error('[Level2] Invalid action for Fill Info button:', action);
+            alert('Unable to open profile questions. Please try refreshing the page.');
         }
     };
 
@@ -313,17 +290,23 @@ export default function ChatConversation() {
     const handleLevel2Yes = async () => {
         try {
             await chatAPI.setLevel2Consent(conversationId, true);
-            setShowLevel2Popup(false);
-            loadLevelStatus();
+            // ✅ Reload status to clear popup_pending flag from backend
+            await loadLevelStatus();
         } catch (error) {
             console.error('[Level] Failed to set Level 2 consent:', error);
         }
     };
 
     // ✅ Handle Level 2 consent - NO  
-    const handleLevel2No = () => {
-        // Keep popup visible, user can change mind later
-        setShowLevel2Popup(false);
+    const handleLevel2No = async () => {
+        try {
+            // ✅ Still call backend to clear popup_pending flag
+            await chatAPI.setLevel2Consent(conversationId, false);
+            // ✅ Reload status to clear popup_pending flag from backend
+            await loadLevelStatus();
+        } catch (error) {
+            console.error('[Level] Failed to decline Level 2 consent:', error);
+        }
     };
 
     // ✅ Handle Level 3 popup - redirect to questions OR show consent
@@ -337,18 +320,23 @@ export default function ChatConversation() {
     const handleLevel3Yes = async () => {
         try {
             await chatAPI.setLevel3Consent(conversationId, true);
-            setShowLevel3Popup(false);
-            loadLevelStatus();
+            // ✅ Reload status to clear popup_pending flag from backend
+            await loadLevelStatus();
         } catch (error) {
             console.error('[Level] Failed to set Level 3 consent:', error);
         }
     };
 
     // ✅ Handle Level 3 consent - NO
-    const handleLevel3No = () => {
-        // Keep popup visible, user can change mind later
-        // Do not set consent to false, just dismiss UI
-        setShowLevel3Popup(false);
+    const handleLevel3No = async () => {
+        try {
+            // ✅ Still call backend to clear popup_pending flag
+            await chatAPI.setLevel3Consent(conversationId, false);
+            // ✅ Reload status to clear popup_pending flag from backend
+            await loadLevelStatus();
+        } catch (error) {
+            console.error('[Level] Failed to decline Level 3 consent:', error);
+        }
     };
 
     const scrollToBottom = () => {
@@ -939,9 +927,10 @@ export default function ChatConversation() {
 
             {/* Input Area */}
             <div className="bg-gradient-to-t from-black/60 to-transparent px-4 py-4 pb-8 z-10 relative">
-                {/* ✅ Level Up Popups */}
+                {/* ✅ Level Up Popups - Driven by backend popupPending flags */}
+                {console.log('[Popup Debug] Rendering - level2PopupPending:', levelStatus?.level2PopupPending, 'show value:', levelStatus?.level2PopupPending === true)}
                 <LevelUpPopup
-                    show={showLevel2Popup}
+                    show={levelStatus?.level2PopupPending === true}
                     type="LEVEL_2"
                     action={levelStatus?.level2Action}
                     partnerName={otherUser?.firstName || otherUser?.name || 'Your match'}
@@ -951,7 +940,7 @@ export default function ChatConversation() {
                 />
                 
                 <LevelUpPopup
-                    show={showLevel3Popup}
+                    show={levelStatus?.level3PopupPending === true}
                     type="LEVEL_3"
                     action={levelStatus?.level3Action}
                     partnerName={otherUser?.firstName || otherUser?.name || 'Your match'}
