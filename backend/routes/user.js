@@ -361,6 +361,16 @@ router.put('/profile', auth, async (req, res) => {
             updateData 
         );
 
+        // ✅ Mark Level 2 completed if required fields are provided
+        const hasLevel2Data = pets && drinking && smoking && height && religiousLevel && kidsPreference && foodPreference;
+        if (hasLevel2Data) {
+            await pool.execute(
+                'UPDATE users SET level2_questions_completed = TRUE, level2_completed_at = CURRENT_TIMESTAMP WHERE id = ?',
+                [req.user.userId]
+            );
+            console.log(`[Level 2] Marked as completed for user ${req.user.userId}`);
+        }
+
         // ✅ Mark Level 3 completed if face photos are provided
         if (facePhotos !== undefined && Array.isArray(facePhotos) && facePhotos.length >= 4) {
             await pool.execute(

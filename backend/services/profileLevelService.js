@@ -48,15 +48,23 @@ class ProfileLevelService {
     static async getVisibilityLevel(conversationId, viewerId, profileOwnerId) {
         const [rows] = await pool.execute(
             `SELECT 
-                current_level,
-                message_count,
-                CASE WHEN user_id_1 = ? THEN level2_user1_consent ELSE level2_user2_consent END as viewer_level2_consent,
-                CASE WHEN user_id_1 = ? THEN level2_user2_consent ELSE level2_user1_consent END as owner_level2_consent,
-                CASE WHEN user_id_1 = ? THEN level3_user1_consent ELSE level3_user2_consent END as viewer_level3_consent,
-                CASE WHEN user_id_1 = ? THEN level3_user2_consent ELSE level3_user1_consent END as owner_level3_consent
-            FROM conversations
-            WHERE id = ?`,
-            [viewerId, profileOwnerId, viewerId, profileOwnerId, conversationId]
+                c.current_level,
+                c.message_count,
+                c.user_id_1,
+                c.user_id_2,
+                c.level2_user1_consent,
+                c.level2_user2_consent,
+                c.level3_user1_consent,
+                c.level3_user2_consent,
+                viewer.level2_questions_completed as viewer_level2_completed,
+                viewer.level3_questions_completed as viewer_level3_completed,
+                owner.level2_questions_completed as owner_level2_completed,
+                owner.level3_questions_completed as owner_level3_completed
+            FROM conversations c
+            JOIN users viewer ON viewer.id = ?
+            JOIN users owner ON owner.id = ?
+            WHERE c.id = ?`,
+            [viewerId, profileOwnerId, conversationId]
         );
 
         if (rows.length === 0) {
@@ -66,24 +74,44 @@ class ProfileLevelService {
         const conv = rows[0];
         const messageCount = conv.message_count;
 
-        console.log(`[Visibility] Conv ${conversationId}: messages=${messageCount}, viewer_level2_consent=${conv.viewer_level2_consent}, owner_level2_consent=${conv.owner_level2_consent}`);
+        // ✅ FIX: Correctly map viewer and owner to their actual positions in conversation
+        const viewerIsUser1 = conv.user_id_1 === viewerId;
+        const ownerIsUser1 = conv.user_id_1 === profileOwnerId;
+        
+        const viewer_level2_consent = viewerIsUser1 ? conv.level2_user1_consent : conv.level2_user2_consent;
+        const owner_level2_consent = ownerIsUser1 ? conv.level2_user1_consent : conv.level2_user2_consent;
+        const viewer_level3_consent = viewerIsUser1 ? conv.level3_user1_consent : conv.level3_user2_consent;
+        const owner_level3_consent = ownerIsUser1 ? conv.level3_user1_consent : conv.level3_user2_consent;
+
+        console.log(`[Visibility] Conv ${conversationId}: messages=${messageCount}`);
+        console.log(`[Visibility] Viewer=${viewerId} (isUser1=${viewerIsUser1}), Owner=${profileOwnerId} (isUser1=${ownerIsUser1})`);
+        console.log(`[Visibility] Level 2 - viewer_consent=${viewer_level2_consent}, owner_consent=${owner_level2_consent}, viewer_completed=${conv.viewer_level2_completed}, owner_completed=${conv.owner_level2_completed}`);
+        console.log(`[Visibility] Level 3 - viewer_consent=${viewer_level3_consent}, owner_consent=${owner_level3_consent}, viewer_completed=${conv.viewer_level3_completed}, owner_completed=${conv.owner_level3_completed}`);
 
         // Determine actual visibility level
         let visibleLevel = 1;
 
-        // ✅ Level 2: Both users must have CONSENTED + 5 messages (not just completed)
+        // ✅ CRITICAL: Level 2 visibility requires BOTH users to have COMPLETED questions AND CONSENTED
         if (messageCount >= this.THRESHOLDS.LEVEL_2 && 
-            conv.viewer_level2_consent && 
-            conv.owner_level2_consent) {
+            viewer_level2_consent && 
+            owner_level2_consent &&
+            conv.viewer_level2_completed &&
+            conv.owner_level2_completed) {
             visibleLevel = 2;
+            console.log('[Visibility] ✅ Level 2 visibility GRANTED');
         }
 
-        // ✅ Level 3: Both users must consent + 10 messages
+        // ✅ CRITICAL: Level 3 visibility requires BOTH users to have COMPLETED questions AND CONSENTED
         if (messageCount >= this.THRESHOLDS.LEVEL_3 && 
-            conv.viewer_level3_consent && 
-            conv.owner_level3_consent) {
+            viewer_level3_consent && 
+            owner_level3_consent &&
+            conv.viewer_level3_completed &&
+            conv.owner_level3_completed) {
             visibleLevel = 3;
+            console.log('[Visibility] ✅ Level 3 visibility GRANTED');
         }
+        
+        console.log(`[Visibility] Final visible level: ${visibleLevel}`);
 
         // Calculate next upgrade info
         let canUpgrade = false;
@@ -121,9 +149,9 @@ class ProfileLevelService {
             [conversationId]
         );
 
-        // Get updated count
+        // Get updated count and conversation details
         const [rows] = await pool.execute(
-            'SELECT message_count, current_level FROM conversations WHERE id = ?',
+            'SELECT message_count, current_level, user_id_1, user_id_2 FROM conversations WHERE id = ?',
             [conversationId]
         );
 
@@ -131,7 +159,7 @@ class ProfileLevelService {
             return { newLevel: null, shouldNotify: false, threshold: null };
         }
 
-        const { message_count, current_level } = rows[0];
+        const { message_count, current_level, user_id_1, user_id_2 } = rows[0];
 
         // Check if we've reached a threshold
         let shouldNotify = false;
@@ -140,9 +168,13 @@ class ProfileLevelService {
         if (message_count === this.THRESHOLDS.LEVEL_2) {
             shouldNotify = true;
             threshold = 'LEVEL_2';
+            // ✅ Set popup_pending flags for both users when Level 2 threshold reached
+            await this.setPopupPending(conversationId, user_id_1, user_id_2, 2);
         } else if (message_count === this.THRESHOLDS.LEVEL_3) {
             shouldNotify = true;
             threshold = 'LEVEL_3';
+            // ✅ Set popup_pending flags for both users when Level 3 threshold reached
+            await this.setPopupPending(conversationId, user_id_1, user_id_2, 3);
         }
 
         return {
@@ -162,6 +194,53 @@ class ProfileLevelService {
             'UPDATE users SET level2_questions_completed = TRUE, level2_completed_at = CURRENT_TIMESTAMP WHERE id = ?',
             [userId]
         );
+    }
+
+    /**
+     * Set popup_pending flags when threshold is reached
+     * Initializes match_levels table if needed
+     * @param {number} conversationId 
+     * @param {number} user1Id 
+     * @param {number} user2Id 
+     * @param {number} level (2 or 3)
+     */
+    static async setPopupPending(conversationId, user1Id, user2Id, level) {
+        try {
+            // Normalize user IDs (ensure user_id_1 < user_id_2)
+            const [userId1, userId2] = user1Id < user2Id ? [user1Id, user2Id] : [user2Id, user1Id];
+            
+            // Check if match_levels record exists
+            const [existing] = await pool.execute(
+                'SELECT id FROM match_levels WHERE conversation_id = ?',
+                [conversationId]
+            );
+            
+            if (existing.length === 0) {
+                // Create match_levels record
+                await pool.execute(
+                    `INSERT INTO match_levels 
+                     (conversation_id, user_id_1, user_id_2, current_level) 
+                     VALUES (?, ?, ?, 1)`,
+                    [conversationId, userId1, userId2]
+                );
+                console.log(`[MatchLevels] Initialized for conversation ${conversationId}`);
+            }
+            
+            // Set popup_pending flags for both users
+            const popupField1 = level === 2 ? 'level2_popup_pending_user1' : 'level3_popup_pending_user1';
+            const popupField2 = level === 2 ? 'level2_popup_pending_user2' : 'level3_popup_pending_user2';
+            
+            await pool.execute(
+                `UPDATE match_levels 
+                 SET ${popupField1} = TRUE, ${popupField2} = TRUE 
+                 WHERE conversation_id = ?`,
+                [conversationId]
+            );
+            
+            console.log(`[Level ${level}] Set popup_pending for both users in conversation ${conversationId}`);
+        } catch (error) {
+            console.error(`[Level ${level}] Error setting popup_pending:`, error);
+        }
     }
 
     /**
@@ -187,6 +266,12 @@ class ProfileLevelService {
 
         // Also mark in users table
         await this.completeLevel2Questions(userId);
+
+        // ✅ CHANGED: Do NOT clear popup_pending when user completes questions
+        // The popup will remain visible but change from "Fill info" to "Yes/No" consent
+        // It will only be cleared when user gives consent (or says No)
+        console.log(`[Level2Complete] User ${userId} completed Level 2 questions for conversation ${conversationId}`);
+        console.log(`[Level2Complete] Popup will remain visible to ask for consent`);
 
         // Check if both users have completed
         const [updated] = await pool.execute(
@@ -228,6 +313,24 @@ class ProfileLevelService {
             [consent, conversationId]
         );
 
+        // ✅ CRITICAL: Clear popup_pending flag in match_levels when user makes decision
+        const [matchLevels] = await pool.execute(
+            'SELECT user_id_1 FROM match_levels WHERE conversation_id = ?',
+            [conversationId]
+        );
+        
+        if (matchLevels.length > 0) {
+            const isUser1InML = matchLevels[0].user_id_1 === userId;
+            const popupField = isUser1InML ? 'level2_popup_pending_user1' : 'level2_popup_pending_user2';
+            
+            await pool.execute(
+                `UPDATE match_levels SET ${popupField} = FALSE WHERE conversation_id = ?`,
+                [conversationId]
+            );
+            
+            console.log(`[Level2Consent] Cleared ${popupField} for conversation ${conversationId}`);
+        }
+
         // Check if both users have consented
         const [updated] = await pool.execute(
             'SELECT level2_user1_consent, level2_user2_consent FROM conversations WHERE id = ?',
@@ -267,6 +370,24 @@ class ProfileLevelService {
             `UPDATE conversations SET ${column} = ? WHERE id = ?`,
             [consent, conversationId]
         );
+
+        // ✅ CRITICAL: Clear popup_pending flag in match_levels when user makes decision
+        const [matchLevels] = await pool.execute(
+            'SELECT user_id_1 FROM match_levels WHERE conversation_id = ?',
+            [conversationId]
+        );
+        
+        if (matchLevels.length > 0) {
+            const isUser1InML = matchLevels[0].user_id_1 === userId;
+            const popupField = isUser1InML ? 'level3_popup_pending_user1' : 'level3_popup_pending_user2';
+            
+            await pool.execute(
+                `UPDATE match_levels SET ${popupField} = FALSE WHERE conversation_id = ?`,
+                [conversationId]
+            );
+            
+            console.log(`[Level3Consent] Cleared ${popupField} for conversation ${conversationId}`);
+        }
 
         // Check if both users have consented
         const [updated] = await pool.execute(
@@ -398,10 +519,16 @@ class ProfileLevelService {
                 u_self.level3_questions_completed as user_level3_completed_global,
                 u_partner.level2_questions_completed as partner_level2_completed_global,
                 u_partner.level3_questions_completed as partner_level3_completed_global,
-                u_partner.first_name as partner_name
+                u_partner.first_name as partner_name,
+                ml.user_id_1 as ml_user_id_1,
+                ml.level2_popup_pending_user1,
+                ml.level2_popup_pending_user2,
+                ml.level3_popup_pending_user1,
+                ml.level3_popup_pending_user2
             FROM conversations c
             JOIN users u_self ON u_self.id = ?
             JOIN users u_partner ON u_partner.id = CASE WHEN c.user_id_1 = ? THEN c.user_id_2 ELSE c.user_id_1 END
+            LEFT JOIN match_levels ml ON ml.conversation_id = c.id
             WHERE c.id = ?`,
             [userId, userId, userId, userId, userId, userId, conversationId]
         );
@@ -423,6 +550,15 @@ class ProfileLevelService {
         const partnerLevel2Consent = Boolean(data.partner_level2_consent);
         const userLevel3Consent = Boolean(data.user_level3_consent);
         const partnerLevel3Consent = Boolean(data.partner_level3_consent);
+
+        // ✅ Get popup pending status from match_levels table
+        const isUser1InMatchLevels = data.ml_user_id_1 === userId;
+        const level2PopupPending = data.ml_user_id_1 
+            ? Boolean(isUser1InMatchLevels ? data.level2_popup_pending_user1 : data.level2_popup_pending_user2)
+            : false;
+        const level3PopupPending = data.ml_user_id_1
+            ? Boolean(isUser1InMatchLevels ? data.level3_popup_pending_user1 : data.level3_popup_pending_user2)
+            : false;
 
         // ✅ CRITICAL: Determine explicit actions for each level
         // Level 2 Action Logic
@@ -459,6 +595,7 @@ class ProfileLevelService {
             level2UserConsent: userLevel2Consent,
             level2PartnerConsent: partnerLevel2Consent,
             level2Visible: msgCount >= this.THRESHOLDS.LEVEL_2 && userLevel2Consent && partnerLevel2Consent,
+            level2PopupPending: level2PopupPending, // ✅ CRITICAL: Backend drives popup visibility
             
             // Level 3 status
             level3ThresholdReached: msgCount >= this.THRESHOLDS.LEVEL_3,
@@ -468,6 +605,7 @@ class ProfileLevelService {
             level3UserConsent: userLevel3Consent,
             level3PartnerConsent: partnerLevel3Consent,
             level3Visible: msgCount >= this.THRESHOLDS.LEVEL_3 && userLevel3Consent && partnerLevel3Consent,
+            level3PopupPending: level3PopupPending, // ✅ CRITICAL: Backend drives popup visibility
             
             partnerName: data.partner_name
         };
