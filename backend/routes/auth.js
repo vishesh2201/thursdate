@@ -98,6 +98,81 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// Store OTPs in memory (in production, use Redis or database)
+const otpStore = new Map();
+
+// Send OTP endpoint
+router.post('/send-otp', async (req, res) => {
+  try {
+    const { mobileNumber } = req.body;
+    
+    if (!mobileNumber || mobileNumber.length < 10) {
+      return res.status(400).json({ error: 'Valid mobile number is required' });
+    }
+    
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Store OTP with 5 minute expiry
+    otpStore.set(mobileNumber, {
+      otp,
+      expiresAt: Date.now() + 5 * 60 * 1000 // 5 minutes
+    });
+    
+    // In production, send SMS via Twilio/AWS SNS
+    console.log(`OTP for ${mobileNumber}: ${otp}`);
+    
+    // For development, return OTP in response (remove in production)
+    res.json({
+      message: 'OTP sent successfully',
+      // Remove this line in production:
+      otp: process.env.NODE_ENV === 'development' ? otp : undefined
+    });
+    
+  } catch (error) {
+    console.error('Send OTP error:', error);
+    res.status(500).json({ error: 'Failed to send OTP' });
+  }
+});
+
+// Verify OTP endpoint
+router.post('/verify-otp', async (req, res) => {
+  try {
+    const { mobileNumber, otp } = req.body;
+    
+    if (!mobileNumber || !otp) {
+      return res.status(400).json({ error: 'Mobile number and OTP are required' });
+    }
+    
+    const storedData = otpStore.get(mobileNumber);
+    
+    if (!storedData) {
+      return res.status(400).json({ error: 'OTP not found or expired' });
+    }
+    
+    if (Date.now() > storedData.expiresAt) {
+      otpStore.delete(mobileNumber);
+      return res.status(400).json({ error: 'OTP expired' });
+    }
+    
+    if (storedData.otp !== otp) {
+      return res.status(400).json({ error: 'Invalid OTP' });
+    }
+    
+    // OTP verified successfully, remove from store
+    otpStore.delete(mobileNumber);
+    
+    res.json({
+      message: 'OTP verified successfully',
+      verified: true
+    });
+    
+  } catch (error) {
+    console.error('Verify OTP error:', error);
+    res.status(500).json({ error: 'Failed to verify OTP' });
+  }
+});
+
 // Delete account endpoint
 router.delete('/account', auth, async (req, res) => {
   try {

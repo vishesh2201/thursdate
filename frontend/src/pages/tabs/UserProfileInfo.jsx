@@ -9,12 +9,13 @@ export default function UserProfileInfo() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [bioMode, setBioMode] = useState('read');
-    
+
     // Lifestyle image carousel state
     const [isMinimized, setIsMinimized] = useState(false);
     const [currentLifestyleImageIndex, setCurrentLifestyleImageIndex] = useState(0);
     const [touchStart, setTouchStart] = useState(0);
     const [scrollTop, setScrollTop] = useState(0);
+    const [viewMode, setViewMode] = useState('lifestyle');
 
     // Define loadUserProfile before useEffects
     const loadUserProfile = async () => {
@@ -129,7 +130,7 @@ export default function UserProfileInfo() {
     };
 
     return (
-        <div 
+        <div
             className="h-screen overflow-hidden flex flex-col"
             onClick={handleBackgroundTap}
             style={{
@@ -143,6 +144,40 @@ export default function UserProfileInfo() {
                 cursor: lifestyleImages.length > 0 ? 'pointer' : 'default'
             }}
         >
+            {/* Top Bar */}
+            <div className="flex items-center justify-between px-6 pt-10 pb-4">
+                <div style={{ width: 40 }}></div>
+                {isMinimized ? (
+                    // Lifestyle/Personal Switch Buttons
+                    <div className="flex items-center gap-3 rounded-full p-1" style={{ backgroundColor: '#76768080' }}>
+                        <button
+                            onClick={() => setViewMode("lifestyle")}
+                            className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${viewMode === "lifestyle"
+                                ? "bg-white text-black"
+                                : "text-white"
+                                }`}
+                        >
+                            Lifestyle
+                        </button>
+                        <button
+                            onClick={() => setViewMode("personal")}
+                            className={`px-6 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-1 ${viewMode === "personal"
+                                ? "bg-white text-black"
+                                : "text-white"
+                                }`}
+                        >
+                            Personal
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                            </svg>
+                        </button>
+                    </div>
+                ) : (
+                    <div className="text-white text-xl font-semibold"></div>
+                )}
+                <div style={{ width: 40 }}></div>
+            </div>
+
             {/* Lifestyle Image Indicators */}
             {lifestyleImages.length > 1 && (
                 <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex gap-2 z-10">
@@ -160,10 +195,10 @@ export default function UserProfileInfo() {
             )}
 
             {/* Profile Card Container */}
-            <div 
-                className={`flex-1 transition-all duration-300 ${isMinimized ? 'overflow-hidden' : 'overflow-y-auto'}`}
+            <div
+                className={`flex-1 px-4 transition-all duration-300 ${isMinimized ? 'overflow-hidden' : 'overflow-y-auto'}`}
                 style={{
-                    transform: isMinimized ? 'translateY(calc(100vh - 280px))' : 'translateY(0)',
+                    transform: isMinimized ? 'translateY(calc(100vh - 280px))' : 'translateY(60px)',
                     transition: 'all 0.3s ease-out',
                 }}
                 onScroll={handleScroll}
@@ -177,18 +212,18 @@ export default function UserProfileInfo() {
                 }}
             >
                 {/* Main Content with rounded corners matching Figma */}
-                <div 
-                    className="max-w-md mx-auto flex flex-col gap-6 px-[24px] py-6 min-h-screen"
+                <div
+                    className="max-w-md mx-auto flex flex-col gap-6 px-[24px] py-6 min-h-screen shadow-lg"
                     style={{
-                        background: 'rgba(0, 0, 0, 0.35)',
-                        backdropFilter: 'blur(10px)',
-                        borderRadius: isMinimized ? '29.771px 29.771px 0 0' : '29.771px',
+                        background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.6) 100%)',
+                        boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
+                        borderRadius: '29.771px 29.771px 0 0',
                     }}
                 >
                     {/* Name, Age, Location Section */}
                     <div className="flex items-start justify-between gap-[49px]">
                         <div className="flex gap-[9.311px] h-[78.276px] items-start">
-                            <div 
+                            <div
                                 className="relative rounded-full shrink-0"
                                 style={{
                                     width: '69.83px',
@@ -216,8 +251,8 @@ export default function UserProfileInfo() {
                                 </p>
                             </div>
                         </div>
-                        
-                        <button 
+
+                        <button
                             onClick={() => navigate(-1)}
                             className="flex items-center justify-center shrink-0"
                             style={{
@@ -235,111 +270,69 @@ export default function UserProfileInfo() {
                         </button>
                     </div>
 
-                    {/* Gender, Body Type, Status, Location Icons Row */}
-                    <div className="flex gap-6 h-[84px] items-start justify-center">
-                        {/* Gender */}
-                        <div className="flex flex-col items-center gap-[10.85px]" style={{ width: '39.695px', height: '66.529px' }}>
-                            <div 
-                                className="bg-white/10 rounded-full flex items-center justify-center"
-                                style={{ width: '39.695px', height: '38.743px' }}
-                            >
-                                <svg className="text-white" style={{ width: '17.863px', height: '17.863px' }} viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                    <circle cx="12" cy="8" r="5" strokeWidth="2"/>
-                                    <path d="M12 13v8m-4-4l4 4 4-4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
+                    {/* Quick Info Icons */}
+                    <div className="flex items-center justify-between mb-6 pb-6 border-b border-white/20">
+                        <div className="flex flex-col items-center">
+                            <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30">
+                                <img src="/profileMale.svg" alt="Gender" className="w-6 h-6" />
                             </div>
-                            <p className="font-['Poppins'] text-[#f1f1f1] text-[12px] leading-[1.5] text-center">
-                                {user.gender || 'Not specified'}
-                            </p>
+                            <span className="text-white/80 text-[10px] mt-1">{user.gender || 'Not specified'}</span>
                         </div>
 
-                        {/* Body Type */}
-                        <div className="flex flex-col items-center gap-[10.85px]" style={{ width: '39.695px', height: '66.529px' }}>
-                            <div 
-                                className="bg-white/10 rounded-full flex items-center justify-center"
-                                style={{ width: '39.695px', height: '38.743px' }}
-                            >
-                                <svg className="text-white" style={{ width: '24px', height: '24px' }} viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                    <path d="M8 6h8M6 8h12M6 16h12M8 18h8M10 4h4v16h-4z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
+                        <div className="flex flex-col items-center">
+                            <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30">
+                                <img src="/profileHeight.svg" alt="Height" className="w-6 h-6" />
                             </div>
-                            <p className="font-['Poppins'] text-[#f1f1f1] text-[12px] leading-[1.5] text-center">
-                                {user.bodyType || 'Not specified'}
-                            </p>
+                            <span className="text-white/80 text-[10px] mt-1">{user.bodyType || 'Not specified'}</span>
                         </div>
 
-                        {/* Relationship Status */}
-                        <div className="flex flex-col items-center gap-[10.85px]" style={{ width: '39.695px', height: '66.529px' }}>
-                            <div 
-                                className="bg-white/10 rounded-full flex items-center justify-center"
-                                style={{ width: '39.695px', height: '38.743px' }}
-                            >
-                                <svg className="text-white" style={{ width: '17.86px', height: '17.86px' }} viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm6 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
-                                    <path fillRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zM4 12a8 8 0 1 1 16 0 8 8 0 0 1-16 0z"/>
-                                </svg>
+                        <div className="flex flex-col items-center">
+                            <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30">
+                                <img src="/profileRelationship.svg" alt="Relationship" className="w-6 h-6" />
                             </div>
-                            <p className="font-['Poppins'] text-[#f1f1f1] text-[12px] leading-[1.5] text-center">
-                                {user.relationshipStatus || 'Not specified'}
-                            </p>
+                            <span className="text-white/80 text-[10px] mt-1">{user.relationshipStatus || 'Not specified'}</span>
                         </div>
 
-                        {/* Current Location */}
-                        <div className="flex flex-col items-center gap-[5.03px]" style={{ width: '45.649px', height: '79.389px' }}>
-                            <div 
-                                className="bg-white/10 rounded-full flex items-center justify-center"
-                                style={{ width: '39.695px', height: '38.743px' }}
-                            >
-                                <svg className="text-white" style={{ width: '17.863px', height: '17.863px' }} viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" strokeWidth="2"/>
-                                    <circle cx="12" cy="9" r="2.5" strokeWidth="2"/>
-                                </svg>
+                        <div className="flex flex-col items-center">
+                            <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30">
+                                <img src="/profileOriginalLocation.svg" alt="From Location" className="w-6 h-6" />
                             </div>
-                            <p className="font-['Poppins'] text-[#f1f1f1] text-[12px] leading-[1.5] text-center whitespace-nowrap">
+                            <span className="text-white/80 text-[10px] mt-1 max-w-[60px] truncate text-center">
+                                {user.fromLocation ? user.fromLocation.split(',').slice(0, 2).join(',') : 'Origin not specified'}
+                            </span>
+                        </div>
+
+                        <div className="flex flex-col items-center">
+                            <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30">
+                                <img src="/profileLocation.svg" alt="Current Location" className="w-6 h-6" />
+                            </div>
+                            <span className="text-white/80 text-[10px] mt-1 truncate max-w-[60px] text-center">
                                 {user.currentLocation ? user.currentLocation.split(',').slice(0, 2).join(',') : 'Location not specified'}
-                            </p>
-                        </div>
-
-                        {/* From Location */}
-                        <div className="flex flex-col items-center gap-[10.02px]" style={{ width: '58.55px', height: '84.351px' }}>
-                            <div 
-                                className="bg-white/10 rounded-full flex items-center justify-center"
-                                style={{ width: '39.695px', height: '38.743px' }}
-                            >
-                                <svg className="text-white" style={{ width: '17.863px', height: '17.863px' }} viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" strokeWidth="2"/>
-                                    <circle cx="12" cy="9" r="2.5" strokeWidth="2"/>
-                                </svg>
-                            </div>
-                            <p className="font-['Poppins'] text-[#f1f1f1] text-[12px] leading-[1.5] text-center whitespace-nowrap">
-                                {user.fromLocation ? `From ${user.fromLocation.split(',').slice(0, 2).join(',')}` : 'Origin not specified'}
-                            </p>
+                            </span>
                         </div>
                     </div>
 
                     {/* Bio Section */}
-                    <div className="flex flex-col gap-3" style={{ width: '336px' }}>
+                    <div className="flex flex-col gap-3 -mt-4" style={{ width: '336px' }}>
                         <h3 className="font-['Poppins'] font-semibold text-[16px] leading-[1.3] text-[#f2f2f2]">Bio</h3>
                         <div className="bg-white/10 rounded-xl px-3 py-[18px] flex flex-col gap-[5px]">
                             {/* Read/Listen Segmented Control */}
-                            <div className="flex bg-[rgba(118,118,128,0.5)] rounded-full p-2 mb-2.5" style={{ width: '291px', height: '36px' }}>
+                            <div className="flex bg-[rgba(118,118,128,0.5)] rounded-full p-1 mb-2.5" style={{ width: '291px', height: '36px' }}>
                                 <button
                                     onClick={() => setBioMode('read')}
-                                    className={`flex-1 px-2.5 py-1 rounded-full text-[14px] leading-[18px] tracking-[-0.08px] font-semibold transition-all ${
-                                        bioMode === 'read' 
-                                            ? 'bg-white text-black shadow-[0px_2px_20px_0px_rgba(0,0,0,0.06)]' 
-                                            : 'text-[#f2f2f2]'
-                                    }`}
+                                    className={`flex-1 px-0.5 py-0.5 rounded-full text-[14px] leading-[18px] tracking-[-0.08px] font-semibold transition-all ${bioMode === 'read'
+                                        ? 'bg-white text-black shadow-[0px_2px_20px_0px_rgba(0,0,0,0.06)]'
+                                        : 'text-[#f2f2f2]'
+                                        }`}
                                 >
                                     Read
                                 </button>
                                 <button
                                     onClick={() => setBioMode('listen')}
-                                    className={`flex-1 px-2.5 py-1 rounded-full text-[14px] leading-[18px] tracking-[-0.08px] font-medium transition-all ${
-                                        bioMode === 'listen' 
-                                            ? 'bg-white text-black shadow-[0px_2px_20px_0px_rgba(0,0,0,0.06)]' 
-                                            : 'text-[#f2f2f2]'
-                                    }`}
+                                    className={`flex-1 px-0.5 py-0.5 rounded-full text-[14px] leading-[18px] tracking-[-0.08px] font-medium transition-all ${bioMode === 'listen'
+                                        ? 'bg-white text-black shadow-[0px_2px_20px_0px_rgba(0,0,0,0.06)]'
+                                        : 'text-[#f2f2f2]'
+                                        }`}
                                 >
                                     Listen
                                 </button>
@@ -352,54 +345,14 @@ export default function UserProfileInfo() {
 
                     {/* Interests Section */}
                     {interests.length > 0 && (
-                        <div className="flex flex-col gap-3" style={{ width: '336px' }}>
-                            <h3 className="font-['Poppins'] font-semibold text-[16px] leading-[1.3] text-[#f2f2f2]">Interests</h3>
-                            <div className="flex flex-col gap-[18px]">
-                                {/* Row 1 */}
-                                {interests.slice(0, 4).length > 0 && (
-                                    <div className="flex gap-[18px] items-start flex-wrap">
-                                        {interests.slice(0, 4).map((interest, idx) => (
-                                            <div 
-                                                key={idx} 
-                                                className="bg-white/10 rounded-full px-2.5 py-2 h-[34px] flex items-center justify-center"
-                                            >
-                                                <p className="font-['Poppins'] font-medium text-[12px] leading-[24px] text-white text-center whitespace-nowrap">
-                                                    {interest}
-                                                </p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                                {/* Row 2 */}
-                                {interests.slice(4, 8).length > 0 && (
-                                    <div className="flex gap-[18px] items-start flex-wrap">
-                                        {interests.slice(4, 8).map((interest, idx) => (
-                                            <div 
-                                                key={idx} 
-                                                className="bg-white/10 rounded-full px-2.5 py-2 h-[34px] flex items-center justify-center"
-                                            >
-                                                <p className="font-['Poppins'] font-medium text-[12px] leading-[24px] text-white text-center whitespace-nowrap">
-                                                    {interest}
-                                                </p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                                {/* Row 3 */}
-                                {interests.slice(8).length > 0 && (
-                                    <div className="flex gap-[18px] items-start flex-wrap">
-                                        {interests.slice(8).map((interest, idx) => (
-                                            <div 
-                                                key={idx} 
-                                                className="bg-white/10 rounded-full px-2.5 py-2 h-[34px] flex items-center justify-center"
-                                            >
-                                                <p className="font-['Poppins'] font-medium text-[12px] leading-[24px] text-white text-center whitespace-nowrap">
-                                                    {interest}
-                                                </p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
+                        <div className="mb-6">
+                            <h3 className="text-white text-base font-semibold mb-3">Interests</h3>
+                            <div className="flex flex-wrap gap-2">
+                                {interests.map((interest, idx) => (
+                                    <span key={idx} className="px-4 py-2 bg-white/20 backdrop-blur-md rounded-full border border-white/30 text-white text-sm">
+                                        {interest}
+                                    </span>
+                                ))}
                             </div>
                         </div>
                     )}
@@ -411,16 +364,16 @@ export default function UserProfileInfo() {
                             <div className="bg-white/10 rounded-xl p-3 flex flex-col gap-3" style={{ width: '336px' }}>
                                 {/* Work */}
                                 {user.intent?.profileQuestions?.jobTitle && (
-                                    <div className="flex gap-[11px] items-center" style={{ width: '312px' }}>
-                                        <div 
+                                    <div className="flex gap-[11px] items-center">
+                                        <div
                                             className="bg-white/10 rounded-full flex items-center justify-center shrink-0"
                                             style={{ width: '42px', height: '42px' }}
                                         >
                                             <svg className="text-white" style={{ width: '21px', height: '21px' }} viewBox="0 0 24 24" fill="currentColor">
-                                                <path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/>
+                                                <path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z" />
                                             </svg>
                                         </div>
-                                        <div className="flex flex-col gap-[2px]" style={{ width: '123px' }}>
+                                        <div className="flex flex-col gap-[2px] flex-1">
                                             <p className="font-['Poppins'] font-semibold text-[14px] leading-[1.4] text-white">
                                                 {user.intent.profileQuestions.jobTitle}
                                             </p>
@@ -430,19 +383,19 @@ export default function UserProfileInfo() {
                                         </div>
                                     </div>
                                 )}
-                                
+
                                 {/* Education */}
                                 {user.intent?.profileQuestions?.education && (
-                                    <div className="flex gap-[11px] items-center" style={{ width: '267px' }}>
-                                        <div 
+                                    <div className="flex gap-[11px] items-center">
+                                        <div
                                             className="bg-white/10 rounded-full flex items-center justify-center shrink-0"
                                             style={{ width: '42px', height: '42px' }}
                                         >
                                             <svg className="text-white" style={{ width: '21px', height: '21px' }} viewBox="0 0 24 24" fill="currentColor">
-                                                <path d="M12 3L1 9l4 2.18v6L12 21l7-3.82v-6l2-1.09V17h2V9L12 3zm6.82 6L12 12.72 5.18 9 12 5.28 18.82 9zM17 15.99l-5 2.73-5-2.73v-3.72L12 15l5-2.73v3.72z"/>
+                                                <path d="M12 3L1 9l4 2.18v6L12 21l7-3.82v-6l2-1.09V17h2V9L12 3zm6.82 6L12 12.72 5.18 9 12 5.28 18.82 9zM17 15.99l-5 2.73-5-2.73v-3.72L12 15l5-2.73v3.72z" />
                                             </svg>
                                         </div>
-                                        <div className="flex flex-col gap-[2px]" style={{ width: '123px' }}>
+                                        <div className="flex flex-col gap-[2px] flex-1">
                                             <p className="font-['Poppins'] font-semibold text-[14px] leading-[1.4] text-white">
                                                 {user.intent.profileQuestions.education}
                                             </p>
@@ -459,146 +412,148 @@ export default function UserProfileInfo() {
 
                     {/* Entertainment Section */}
                     {(watchlist.length > 0 || tvShows.length > 0 || movies.length > 0 || artistsBands.length > 0) && (
-                        <div className="flex flex-col gap-3" style={{ width: '336px' }}>
-                            <h3 className="font-['Poppins'] font-semibold text-[16px] leading-[1.3] text-[#f2f2f2]">Entertainment</h3>
-                            <div className="bg-white/10 rounded-xl p-3" style={{ width: '336px' }}>
-                                <div className="flex flex-col gap-[2px]" style={{ width: '312px' }}>
-                                    {/* Watchlists */}
-                                    {(watchlist.length > 0 || tvShows.length > 0 || movies.length > 0) && (
-                                        <>
-                                            <h4 className="font-['Poppins'] font-medium text-[14px] leading-[1.3] text-[#f2f2f2]">Watchlists</h4>
-                                            <div className="flex flex-col gap-[5px]">
-                                                {[...watchlist, ...tvShows, ...movies].slice(0, 2).map((item, idx) => (
-                                                    <div key={idx} className="flex gap-2 items-center py-2">
-                                                        <div className="w-12 h-12 rounded overflow-hidden bg-white/20 shrink-0">
-                                                            <div className="w-full h-full bg-gradient-to-br from-purple-600 to-blue-600"></div>
-                                                        </div>
-                                                        <div className="flex flex-col gap-[2px]">
-                                                            <p className="font-['Poppins'] text-[14px] leading-[20px] text-white">{item}</p>
-                                                            <p className="font-['Figtree'] text-[14px] leading-[20px] text-white">
-                                                                Directed by <span className="font-bold">Frank Darabont</span>
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </>
-                                    )}
+                        <div className="mb-4">
+                            <h3 className="text-white text-base font-semibold mb-3">Entertainment</h3>
 
-                                    {/* Tunes/Music */}
-                                    {artistsBands.length > 0 && (
-                                        <div className="flex flex-col gap-[2px]">
-                                            <h4 className="font-['Poppins'] font-medium text-[14px] leading-[1.3] text-[#f2f2f2] mt-2">Tunes</h4>
-                                            <div className="flex flex-col gap-[5px]">
-                                                {artistsBands.slice(0, 2).map((artist, idx) => (
-                                                    <div key={idx} className="flex gap-2 items-center py-2">
-                                                        <div className="w-12 h-12 rounded overflow-hidden bg-white/20 shrink-0">
-                                                            <div className="w-full h-full bg-gradient-to-br from-pink-600 to-orange-600"></div>
-                                                        </div>
-                                                        <div className="flex flex-col gap-[2px]">
-                                                            <p className="font-['Poppins'] text-[14px] leading-[20px] text-white">{artist}</p>
-                                                            <p className="font-['Figtree'] text-[14px] leading-[20px] text-white">
-                                                                By <span className="font-bold">Various Artists</span>
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
+                            <div className="bg-white/10 rounded-xl p-3 flex flex-col gap-3">
+                                {/* Watchlist */}
+                                {watchlist.length > 0 && (
+                                    <div className="mb-4">
+                                        <div className="text-white/70 text-xs font-medium mb-2">Watchlist</div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {watchlist.map((item, idx) => (
+                                                <div key={idx} className="px-3 py-1.5 bg-white/10 backdrop-blur-md rounded-lg border border-white/20">
+                                                    <span className="text-white text-xs">{item}</span>
+                                                </div>
+                                            ))}
                                         </div>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
+
+                                {/* TV Shows */}
+                                {tvShows.length > 0 && (
+                                    <div className="mb-4">
+                                        <div className="text-white/70 text-xs font-medium mb-2">TV Shows</div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {tvShows.map((show, idx) => (
+                                                <div key={idx} className="px-3 py-1.5 bg-white/10 backdrop-blur-md rounded-lg border border-white/20">
+                                                    <span className="text-white text-xs">{show}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Movies */}
+                                {movies.length > 0 && (
+                                    <div className="mb-4">
+                                        <div className="text-white/70 text-xs font-medium mb-2">Movies</div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {movies.map((movie, idx) => (
+                                                <div key={idx} className="px-3 py-1.5 bg-white/10 backdrop-blur-md rounded-lg border border-white/20">
+                                                    <span className="text-white text-xs">{movie}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Artists/Bands */}
+                                {artistsBands.length > 0 && (
+                                    <div>
+                                        <div className="text-white/70 text-xs font-medium mb-2">Tunes</div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {artistsBands.map((artist, idx) => (
+                                                <div key={idx} className="px-3 py-1.5 bg-white/10 backdrop-blur-md rounded-lg border border-white/20">
+                                                    <span className="text-white text-xs">{artist}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
 
                     {/* Lifestyle Section */}
                     {(user.favouriteTravelDestination || user.pets || user.foodPreference || user.intent?.profileQuestions?.sleepSchedule || user.drinking || user.smoking) && (
-                        <div className="flex flex-col gap-3" style={{ width: '336px' }}>
-                            <h3 className="font-['Poppins'] font-semibold text-[16px] leading-[1.3] text-[#f2f2f2]">Lifestyle</h3>
+                        <div className="mb-4">
+                            <h3 className="text-white text-base font-semibold mb-3">Lifestyle</h3>
+
                             <div className="bg-white/10 rounded-xl p-3 flex flex-col gap-3">
-                                {user.favouriteTravelDestination && (
-                                    <div className="flex gap-[11px] items-center" style={{ width: '312px' }}>
-                                        <div className="bg-white/10 rounded-full flex items-center justify-center shrink-0" style={{ width: '38px', height: '38px' }}>
-                                            <svg className="text-white" style={{ width: '19px', height: '19px' }} viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" strokeWidth="2"/>
-                                                <circle cx="12" cy="9" r="2.5" strokeWidth="2"/>
-                                            </svg>
+                                <div className="space-y-3">
+                                    {user.favouriteTravelDestination && (
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center flex-shrink-0 border border-white/30">
+                                                <img src="/profileLocation.svg" alt="Favorite Destination" className="w-4 h-4" />
+                                            </div>
+                                            <div>
+                                                <div className="text-white/70 text-xs">Favorite Destination</div>
+                                                <div className="text-white font-medium text-sm">{user.favouriteTravelDestination}</div>
+                                            </div>
                                         </div>
-                                        <div className="flex flex-col gap-[2px]" style={{ width: '123px' }}>
-                                            <p className="font-['Poppins'] font-semibold text-[14px] leading-[1.4] text-white">Favorite Destination</p>
-                                            <p className="font-['Poppins'] text-[14px] leading-[1.4] text-white">{user.favouriteTravelDestination}</p>
+                                    )}
+
+                                    {user.pets && (
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center flex-shrink-0 border border-white/30">
+                                                <img src="/profilePetPreference.svg" alt="Pet Preference" className="w-4 h-4" />
+                                            </div>
+                                            <div>
+                                                <div className="text-white/70 text-xs">Pet Preference</div>
+                                                <div className="text-white font-medium text-sm">{user.pets}</div>
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
-                                {user.pets && (
-                                    <div className="flex gap-[11px] items-center">
-                                        <div className="bg-white/10 rounded-full flex items-center justify-center shrink-0" style={{ width: '38px', height: '38px' }}>
-                                            <svg className="text-white" style={{ width: '19px', height: '19px' }} viewBox="0 0 24 24" fill="currentColor">
-                                                <path d="M4.5 12c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5-.67 1.5-1.5 1.5-1.5-.67-1.5-1.5zm4-4c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5-.67 1.5-1.5 1.5-1.5-.67-1.5-1.5zm4 0c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5-.67 1.5-1.5 1.5-1.5-.67-1.5-1.5zm4 4c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5-.67 1.5-1.5 1.5-1.5-.67-1.5-1.5zm-4 5c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
-                                            </svg>
+                                    )}
+
+                                    {user.foodPreference && (
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center flex-shrink-0 border border-white/30">
+                                                <img src="/profileFoodPreference.svg" alt="Food Preference" className="w-4 h-4" />
+                                            </div>
+                                            <div>
+                                                <div className="text-white/70 text-xs">Food Preference</div>
+                                                <div className="text-white font-medium text-sm">{user.foodPreference}</div>
+                                            </div>
                                         </div>
-                                        <div className="flex flex-col gap-[2px]" style={{ width: '123px' }}>
-                                            <p className="font-['Poppins'] font-semibold text-[14px] leading-[1.4] text-white">Pet Preference</p>
-                                            <p className="font-['Poppins'] text-[14px] leading-[1.4] text-white">{user.pets}</p>
+                                    )}
+
+                                    {user.intent?.profileQuestions?.sleepSchedule && (
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center flex-shrink-0 border border-white/30">
+                                                <img src="/profileMorningPerson.svg" alt="Morning/Night Person" className="w-4 h-4" />
+                                            </div>
+                                            <div>
+                                                <div className="text-white/70 text-xs">Morning/Night Person</div>
+                                                <div className="text-white font-medium text-sm">{user.intent.profileQuestions.sleepSchedule}</div>
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
-                                {user.foodPreference && (
-                                    <div className="flex gap-[11px] items-center">
-                                        <div className="bg-white/10 rounded-full flex items-center justify-center shrink-0" style={{ width: '38px', height: '38px' }}>
-                                            <svg className="text-white" style={{ width: '19px', height: '19px' }} viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                                <path d="M3 2v7c0 1.1.9 2 2 2h4v11h2V11h4c1.1 0 2-.9 2-2V2h-2v7h-2V2h-2v7h-2V2H7v7H5V2H3z" strokeWidth="1.5"/>
-                                            </svg>
+                                    )}
+
+                                    {user.drinking && (
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center flex-shrink-0 border border-white/30">
+                                                <img src="/profileDrinking.svg" alt="Drinking" className="w-4 h-4" />
+                                            </div>
+                                            <div>
+                                                <div className="text-white/70 text-xs">Drinking</div>
+                                                <div className="text-white font-medium text-sm">{user.drinking}</div>
+                                            </div>
                                         </div>
-                                        <div className="flex flex-col gap-[2px]" style={{ width: '123px' }}>
-                                            <p className="font-['Poppins'] font-semibold text-[14px] leading-[1.4] text-white">Food Preference</p>
-                                            <p className="font-['Poppins'] text-[14px] leading-[1.4] text-white">{user.foodPreference}</p>
+                                    )}
+
+                                    {user.smoking && (
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center flex-shrink-0 border border-white/30">
+                                                <img src="/profileSmoking.svg" alt="Smoking" className="w-4 h-4" />
+                                            </div>
+                                            <div>
+                                                <div className="text-white/70 text-xs">Smoking</div>
+                                                <div className="text-white font-medium text-sm">{user.smoking}</div>
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
-                                {user.intent?.profileQuestions?.sleepSchedule && (
-                                    <div className="flex gap-[11px] items-center">
-                                        <div className="bg-white/10 rounded-full flex items-center justify-center shrink-0" style={{ width: '38px', height: '38px' }}>
-                                            <svg className="text-white" style={{ width: '19px', height: '19px' }} viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                            </svg>
-                                        </div>
-                                        <div className="flex flex-col gap-[2px]" style={{ width: '123px' }}>
-                                            <p className="font-['Poppins'] font-semibold text-[14px] leading-[1.4] text-white">Morning/Night Person</p>
-                                            <p className="font-['Poppins'] text-[14px] leading-[1.4] text-white">{user.intent.profileQuestions.sleepSchedule}</p>
-                                        </div>
-                                    </div>
-                                )}
-                                {user.drinking && (
-                                    <div className="flex gap-[11px] items-center">
-                                        <div className="bg-white/10 rounded-full flex items-center justify-center shrink-0" style={{ width: '38px', height: '38px' }}>
-                                            <svg className="text-white" style={{ width: '19px', height: '19px' }} viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                                <path d="M7 2L7 10C7 12.2091 8.79086 14 11 14H11C13.2091 14 15 12.2091 15 10V2" strokeWidth="2" strokeLinecap="round"/>
-                                                <path d="M11 14V22" strokeWidth="2" strokeLinecap="round"/>
-                                                <path d="M8 22H14" strokeWidth="2" strokeLinecap="round"/>
-                                            </svg>
-                                        </div>
-                                        <div className="flex flex-col gap-[2px]" style={{ width: '123px' }}>
-                                            <p className="font-['Poppins'] font-semibold text-[14px] leading-[1.4] text-white">Drinking</p>
-                                            <p className="font-['Poppins'] text-[14px] leading-[1.4] text-white">{user.drinking}</p>
-                                        </div>
-                                    </div>
-                                )}
-                                {user.smoking && (
-                                    <div className="flex gap-[11px] items-center">
-                                        <div className="bg-white/10 rounded-full flex items-center justify-center shrink-0" style={{ width: '38px', height: '38px' }}>
-                                            <svg className="text-white" style={{ width: '19px', height: '19px' }} viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                                <path d="M18 8C18 6.34315 19.3431 5 21 5M13.5 5C13.5 3.61929 14.6193 2.5 16 2.5C16.3364 2.5 16.6585 2.56509 16.9521 2.68393" strokeWidth="2" strokeLinecap="round"/>
-                                                <rect x="2" y="13" width="18" height="8" rx="1" strokeWidth="2"/>
-                                                <rect x="20" y="13" width="2" height="8" rx="1" fill="currentColor"/>
-                                            </svg>
-                                        </div>
-                                        <div className="flex flex-col gap-[2px]" style={{ width: '123px' }}>
-                                            <p className="font-['Poppins'] font-semibold text-[14px] leading-[1.4] text-white">Smoking</p>
-                                            <p className="font-['Poppins'] text-[14px] leading-[1.4] text-white">{user.smoking}</p>
-                                        </div>
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                             </div>
                         </div>
                     )}
@@ -612,8 +567,8 @@ export default function UserProfileInfo() {
                                     <div className="flex gap-[11px] items-center" style={{ width: '312px' }}>
                                         <div className="bg-white/10 rounded-full flex items-center justify-center shrink-0" style={{ width: '38px', height: '38px' }}>
                                             <svg className="text-white" style={{ width: '19px', height: '19px' }} viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                                <rect x="3" y="4" width="18" height="16" rx="2" strokeWidth="2"/>
-                                                <path d="M3 8h18M7 12h4" strokeWidth="2" strokeLinecap="round"/>
+                                                <rect x="3" y="4" width="18" height="16" rx="2" strokeWidth="2" />
+                                                <path d="M3 8h18M7 12h4" strokeWidth="2" strokeLinecap="round" />
                                             </svg>
                                         </div>
                                         <div className="flex flex-col gap-[2px]" style={{ width: '123px' }}>
@@ -626,7 +581,7 @@ export default function UserProfileInfo() {
                                     <div className="flex gap-[11px] items-center" style={{ width: '312px' }}>
                                         <div className="bg-white/10 rounded-full flex items-center justify-center shrink-0" style={{ width: '38px', height: '38px' }}>
                                             <svg className="text-white" style={{ width: '19px', height: '19px' }} viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                             </svg>
                                         </div>
                                         <div className="flex flex-col gap-[2px]" style={{ width: '123px' }}>
@@ -650,8 +605,8 @@ export default function UserProfileInfo() {
                                     <div className="flex gap-[11px] items-center" style={{ width: '312px' }}>
                                         <div className="bg-white/10 rounded-full flex items-center justify-center shrink-0" style={{ width: '38px', height: '38px' }}>
                                             <svg className="text-white" style={{ width: '19px', height: '19px' }} viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                                <circle cx="12" cy="8" r="4" strokeWidth="2"/>
-                                                <path d="M12 12v8m-3-5l3 3 3-3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <circle cx="12" cy="8" r="4" strokeWidth="2" />
+                                                <path d="M12 12v8m-3-5l3 3 3-3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                             </svg>
                                         </div>
                                         <div className="flex flex-col gap-[2px]" style={{ width: '123px' }}>
@@ -664,7 +619,7 @@ export default function UserProfileInfo() {
                                     <div className="flex gap-[11px] items-center" style={{ width: '312px' }}>
                                         <div className="bg-white/10 rounded-full flex items-center justify-center shrink-0" style={{ width: '38px', height: '38px' }}>
                                             <svg className="text-white" style={{ width: '19px', height: '19px' }} viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                                <path d="M12 2C8.5 7 5.5 11.5 5.5 15.5a6.5 6.5 0 1 0 13 0C18.5 11.5 15.5 7 12 2z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                                <path d="M12 2C8.5 7 5.5 11.5 5.5 15.5a6.5 6.5 0 1 0 13 0C18.5 11.5 15.5 7 12 2z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                             </svg>
                                         </div>
                                         <div className="flex flex-col gap-[2px]" style={{ width: '123px' }}>
@@ -677,8 +632,8 @@ export default function UserProfileInfo() {
                                     <div className="flex gap-[11px] items-center" style={{ width: '312px' }}>
                                         <div className="bg-white/10 rounded-full flex items-center justify-center shrink-0" style={{ width: '38px', height: '38px' }}>
                                             <svg className="text-white" style={{ width: '19px', height: '19px' }} viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" strokeWidth="2"/>
-                                                <polyline points="9 22 9 12 15 12 15 22" strokeWidth="2"/>
+                                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" strokeWidth="2" />
+                                                <polyline points="9 22 9 12 15 12 15 22" strokeWidth="2" />
                                             </svg>
                                         </div>
                                         <div className="flex flex-col gap-[2px]" style={{ width: '123px' }}>
@@ -697,8 +652,8 @@ export default function UserProfileInfo() {
                             <h3 className="font-['Poppins'] font-semibold text-[16px] leading-[1.3] text-[#f2f2f2]">Languages</h3>
                             <div className="flex gap-[18px] items-start flex-wrap">
                                 {languages.map((language, idx) => (
-                                    <div 
-                                        key={idx} 
+                                    <div
+                                        key={idx}
                                         className="bg-white/10 rounded-full px-2.5 py-2 h-[34px] flex items-center justify-center"
                                     >
                                         <p className="font-['Poppins'] font-medium text-[12px] leading-[24px] text-white text-center whitespace-nowrap">

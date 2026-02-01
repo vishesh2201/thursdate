@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
+const API_URL = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:5000/api';
+
 const BUTTON_SOLID =
   "bg-white text-black text-base font-medium rounded-lg transition duration-200 hover:bg-gray-100 disabled:opacity-60";
 const INPUT_CLEAN =
@@ -18,6 +20,8 @@ export default function Verification() {
   const [mobileNumber, setMobileNumber] = useState("");
   const [otp, setOtp] = useState("");
   const [timer, setTimer] = useState(120);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (step === "otp" && timer > 0) {
@@ -28,16 +32,73 @@ export default function Verification() {
     }
   }, [step, timer]);
 
-  const handleSendOtp = () => {
-    if (mobileNumber.length >= 10) {
+  const handleSendOtp = async () => {
+    if (mobileNumber.length < 10) {
+      setError("Please enter a valid 10-digit mobile number");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch(`${API_URL}/auth/send-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ mobileNumber }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send OTP');
+      }
+
+      // For development - log the OTP
+      if (data.otp) {
+        console.log('Development OTP:', data.otp);
+      }
+
       setTimer(120);
       setStep("otp");
+    } catch (err) {
+      setError(err.message || 'Failed to send OTP. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleVerifyOtp = () => {
-    if (otp.length === 6) {
+  const handleVerifyOtp = async () => {
+    if (otp.length !== 6) {
+      setError("Please enter a valid 6-digit OTP");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch(`${API_URL}/auth/verify-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ mobileNumber, otp }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Invalid OTP');
+      }
+
       setStep("success");
+    } catch (err) {
+      setError(err.message || 'Failed to verify OTP. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -53,17 +114,25 @@ export default function Verification() {
       <input
         type="tel"
         value={mobileNumber}
-        onChange={(e) => setMobileNumber(e.target.value)}
+        onChange={(e) => {
+          setMobileNumber(e.target.value.replace(/[^0-9]/g, ''));
+          setError("");
+        }}
         placeholder="Enter Mobile number"
-        className={INPUT_CLEAN + " mb-8"}
+        className={INPUT_CLEAN + " mb-4"}
         maxLength={10}
       />
 
+      {error && (
+        <p className="text-red-400 text-sm mb-4">{error}</p>
+      )}
+
       <button
         onClick={handleSendOtp}
-        className={BUTTON_SOLID + " w-full py-4"}
+        disabled={loading || mobileNumber.length < 10}
+        className={BUTTON_SOLID + " w-full py-4 mt-4"}
       >
-        Next
+        {loading ? 'Sending...' : 'Next'}
       </button>
     </>
   );
@@ -83,10 +152,17 @@ export default function Verification() {
       <input
         type="number"
         value={otp}
-        onChange={(e) => setOtp(e.target.value.slice(0, 6))}
+        onChange={(e) => {
+          setOtp(e.target.value.slice(0, 6));
+          setError("");
+        }}
         placeholder="------"
-        className={INPUT_CLEAN + " text-center tracking-widest text-lg mb-6"}
+        className={INPUT_CLEAN + " text-center tracking-widest text-lg mb-4"}
       />
+
+      {error && (
+        <p className="text-red-400 text-sm mb-4 text-center">{error}</p>
+      )}
 
       <div className="w-full mb-10 text-left text-sm">
         {timer > 0 ? (
@@ -109,10 +185,10 @@ export default function Verification() {
 
       <button
         onClick={handleVerifyOtp}
-        disabled={otp.length !== 6}
+        disabled={loading || otp.length !== 6}
         className={BUTTON_SOLID + " w-full py-4"}
       >
-        Next
+        {loading ? 'Verifying...' : 'Next'}
       </button>
     </>
   );

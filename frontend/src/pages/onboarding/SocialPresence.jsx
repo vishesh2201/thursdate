@@ -9,7 +9,8 @@ export default function SocialPresence() {
     // === STATES ===
     const [email, setEmail] = useState("");
     const [showConfirm, setShowConfirm] = useState(false);
-    const [confirmEmail, setConfirmEmail] = useState("");
+    const [emailOTP, setEmailOTP] = useState("");
+    const [emailOTPVerified, setEmailOTPVerified] = useState(false);
     const [step, setStep] = useState(1);
     const [instagram, setInstagram] = useState(""); // Reused for all inputs
     const [showInstaConfirm, setShowInstaConfirm] = useState(false);
@@ -25,9 +26,11 @@ export default function SocialPresence() {
     const [licenseBackPreview, setLicenseBackPreview] = useState(null);
     const [licenseVerified, setLicenseVerified] = useState(false);
 
-    // OTP Timer (Aadhaar only)
+    // OTP Timers
     const [resendTimer, setResendTimer] = useState(30);
     const [canResend, setCanResend] = useState(false);
+    const [emailResendTimer, setEmailResendTimer] = useState(30);
+    const [emailCanResend, setEmailCanResend] = useState(false);
 
     // === GLASS STYLES ===
     const INPUT_GLASS =
@@ -39,7 +42,6 @@ export default function SocialPresence() {
 
     // === VALIDATIONS ===
     const isEmailValid = email.trim() && /.+@.+\..+/.test(email);
-    const isConfirmValid = confirmEmail.trim() && confirmEmail === email;
 
     const isInputValid = () => {
         if (!instagram.trim()) return false;
@@ -59,6 +61,16 @@ export default function SocialPresence() {
             setCanResend(true);
         }
     }, [resendTimer, showCodeInput, verificationMethod]);
+
+    // Email OTP Timer
+    useEffect(() => {
+        if (showConfirm && emailResendTimer > 0) {
+            const timer = setTimeout(() => setEmailResendTimer(emailResendTimer - 1), 1000);
+            return () => clearTimeout(timer);
+        } else if (emailResendTimer === 0) {
+            setEmailCanResend(true);
+        }
+    }, [emailResendTimer, showConfirm]);
 
     // cleanup object URLs when component unmounts
     useEffect(() => {
@@ -88,6 +100,42 @@ export default function SocialPresence() {
     }, []);
 
     // === HANDLERS ===
+    const handleSendEmailOTP = async () => {
+        try {
+            // TODO: Call backend API to send OTP to email
+            // await userAPI.sendEmailOTP({ email });
+            console.log('Sending OTP to:', email);
+            setShowConfirm(true);
+            setEmailResendTimer(30);
+            setEmailCanResend(false);
+        } catch (err) {
+            console.error('Failed to send email OTP:', err);
+            alert('Failed to send OTP. Please try again.');
+        }
+    };
+
+    const handleResendEmailOTP = () => {
+        setEmailResendTimer(30);
+        setEmailCanResend(false);
+        setEmailOTP("");
+        // TODO: Call backend API to resend OTP
+        console.log('Resending OTP to:', email);
+    };
+
+    const handleVerifyEmailOTP = async () => {
+        if (emailOTP.length === 6) {
+            try {
+                // TODO: Call backend API to verify OTP
+                // await userAPI.verifyEmailOTP({ email, otp: emailOTP });
+                console.log('Verifying OTP:', emailOTP);
+                setEmailOTPVerified(true);
+            } catch (err) {
+                console.error('Failed to verify email OTP:', err);
+                alert('Invalid OTP. Please try again.');
+            }
+        }
+    };
+
     const handleResendOTP = () => {
         setResendTimer(30);
         setCanResend(false);
@@ -201,49 +249,75 @@ export default function SocialPresence() {
                         {!showConfirm && (
                             <button
                                 disabled={!isEmailValid}
-                                onClick={() => setShowConfirm(true)}
+                                onClick={handleSendEmailOTP}
                                 className={`w-full py-4 rounded-[9999px] font-medium text-lg mt-8 transition ${!isEmailValid ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE}`}
                             >
                                 Next
                             </button>
                         )}
 
-                        {/* Email Confirm Modal */}
+                        {/* Email OTP Modal */}
                         {showConfirm && (
                             <div className="fixed left-0 right-0 bottom-0 flex justify-center items-end pb-6 z-50">
                                 <div className="w-full max-w-sm mx-auto rounded-3xl bg-white/20 backdrop-blur-lg shadow-2xl p-6 flex flex-col items-center border border-white/30">
-                                    <img src={emailConfirmIcon} alt="Email" className="w-14 h-14 mb-4" />
-                                    <div className="text-white text-lg font-semibold mb-2">Email Confirmation</div>
-                                    <div className="text-white/80 text-sm mb-6 text-center">
-                                        Please confirm your email address for verification and account recovery.
-                                    </div>
-                                    <div className="w-full flex items-center bg-white/10 rounded-xl px-3 py-2 mb-4 border border-white/20">
-                                        <input
-                                            type="email"
-                                            value={confirmEmail}
-                                            onChange={(e) => setConfirmEmail(e.target.value)}
-                                            placeholder="Confirm your email"
-                                            className="flex-1 bg-transparent outline-none text-white placeholder-white/60 text-sm"
-                                        />
-                                        <button
-                                            className="ml-2 text-white/70 hover:text-white"
-                                            onClick={() => setConfirmEmail("")}
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24">
-                                                <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 6 6 18M6 6l12 12" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                    <button
-                                        disabled={!isConfirmValid}
-                                        onClick={() => {
-                                            setStep(2);
-                                            setShowConfirm(false);
-                                        }}
-                                        className={`w-full py-4 rounded-xl font-medium text-lg transition ${!isConfirmValid ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE}`}
-                                    >
-                                        Looks good! Continue
-                                    </button>
+                                    {!emailOTPVerified ? (
+                                        <>
+                                            <img src={emailConfirmIcon} alt="Email" className="w-14 h-14 mb-4" />
+                                            <div className="text-white text-lg font-semibold mb-2">Email Verification</div>
+                                            <div className="text-white/80 text-sm mb-6 text-center">
+                                                Enter the 6-digit OTP sent to {email}
+                                            </div>
+                                            <input
+                                                type="text"
+                                                maxLength={6}
+                                                value={emailOTP}
+                                                onChange={(e) => {
+                                                    const val = e.target.value.replace(/[^0-9]/g, "");
+                                                    setEmailOTP(val);
+                                                }}
+                                                placeholder="6-digit OTP"
+                                                className="w-full px-4 py-4 border rounded-xl text-sm mb-2 transition bg-white/20 backdrop-blur-sm text-white placeholder-white/80 border-white/30"
+                                            />
+                                            <div className="text-white/60 text-xs mb-4">
+                                                {emailCanResend ? (
+                                                    <button onClick={handleResendEmailOTP} className="text-white underline hover:text-white/80">
+                                                        Resend OTP
+                                                    </button>
+                                                ) : (
+                                                    <span>Resend in {emailResendTimer}s</span>
+                                                )}
+                                            </div>
+                                            <button
+                                                disabled={emailOTP.length !== 6}
+                                                onClick={handleVerifyEmailOTP}
+                                                className={`w-full py-4 rounded-xl font-medium text-lg transition ${emailOTP.length !== 6 ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE}`}
+                                            >
+                                                Verify OTP
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="flex items-center justify-center mb-4">
+                                                <span className="flex items-center justify-center w-20 h-20 rounded-full bg-[#4CAF50]">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M20 6L9 17l-5-5" />
+                                                    </svg>
+                                                </span>
+                                            </div>
+                                            <div className="text-white text-center text-base font-semibold leading-tight mb-6">
+                                                Your email has been verified successfully.
+                                            </div>
+                                            <button
+                                                className={`w-full py-4 rounded-xl font-medium text-lg transition ${BUTTON_GLASS_ACTIVE}`}
+                                                onClick={() => {
+                                                    setStep(2);
+                                                    setShowConfirm(false);
+                                                }}
+                                            >
+                                                Continue
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         )}

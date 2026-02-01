@@ -1,6 +1,7 @@
 const express = require('express');
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
+const pool = require('../config/db');
 const router = express.Router();
 
 // LinkedIn OAuth endpoints
@@ -64,9 +65,33 @@ router.get('/linkedin/callback', async (req, res) => {
         // Extract profile URL (LinkedIn provides this in the userinfo response)
         const profileUrl = userInfo.sub ? `https://www.linkedin.com/in/${userInfo.sub}` : '';
         
-        // Generate JWT token for your app
+        // Find or create user in database
+        const [existingUsers] = await pool.execute(
+            'SELECT id FROM users WHERE email = ?',
+            [userInfo.email]
+        );
+        
+        let userId;
+        if (existingUsers.length > 0) {
+            userId = existingUsers[0].id;
+            // Update LinkedIn info for existing user
+            await pool.execute(
+                'UPDATE users SET linkedin_url = ? WHERE id = ?',
+                [profileUrl, userId]
+            );
+        } else {
+            // Create new user
+            const [result] = await pool.execute(
+                'INSERT INTO users (email, linkedin_url, approval, onboarding_complete) VALUES (?, ?, ?, ?)',
+                [userInfo.email, profileUrl, false, false]
+            );
+            userId = result.insertId;
+        }
+        
+        // Generate JWT token for your app with userId
         const token = jwt.sign(
             { 
+                userId: userId,
                 linkedinId: userInfo.sub,
                 email: userInfo.email,
                 name: userInfo.name,
