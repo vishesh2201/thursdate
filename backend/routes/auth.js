@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 const auth = require('../middleware/auth');
 const emailService = require('../services/emailService');
+const smsService = require('../services/smsService');
 const otpManager = require('../utils/otpManager');
 const router = express.Router();
 
@@ -254,10 +255,12 @@ router.post('/resend-email-otp', async (req, res) => {
 
 // ===== END EMAIL OTP ENDPOINTS =====
 
-// Store OTPs in memory (in production, use Redis or database)
-const otpStore = new Map();
+// ===== SMS OTP ENDPOINTS (2factor.in) =====
 
-// Send OTP endpoint
+// Store session IDs temporarily (maps mobile number to 2factor session ID)
+const sessionStore = new Map();
+
+// Send SMS OTP endpoint
 router.post('/send-otp', async (req, res) => {
   try {
     const { mobileNumber } = req.body;
@@ -266,32 +269,38 @@ router.post('/send-otp', async (req, res) => {
       return res.status(400).json({ error: 'Valid mobile number is required' });
     }
     
-    // Generate 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Clean mobile number (remove any non-digits)
+    const cleanNumber = mobileNumber.replace(/\D/g, '');
     
-    // Store OTP with 5 minute expiry
-    otpStore.set(mobileNumber, {
-      otp,
-      expiresAt: Date.now() + 5 * 60 * 1000 // 5 minutes
+    if (cleanNumber.length !== 10) {
+      return res.status(400).json({ error: 'Mobile number must be 10 digits' });
+    }
+    
+    // Send OTP via 2factor.in
+    const result = await smsService.sendOTP(cleanNumber);
+    
+    if (!result.success) {
+      return res.status(500).json({ error: result.error || 'Failed to send OTP' });
+    }
+    
+    // Store session ID for verification
+    sessionStore.set(cleanNumber, {
+      sessionId: result.sessionId,
+      expiresAt: Date.now() + 10 * 60 * 1000 // 10 minutes
     });
     
-    // In production, send SMS via Twilio/AWS SNS
-    console.log(`OTP for ${mobileNumber}: ${otp}`);
-    
-    // For development, return OTP in response (remove in production)
     res.json({
-      message: 'OTP sent successfully',
-      // Remove this line in production:
-      otp: process.env.NODE_ENV === 'development' ? otp : undefined
+      message: 'OTP sent successfully to your mobile number',
+      success: true
     });
     
   } catch (error) {
     console.error('Send OTP error:', error);
-    res.status(500).json({ error: 'Failed to send OTP' });
+    res.status(500).json({ error: 'Failed to send OTP. Please try again.' });
   }
 });
 
-// Verify OTP endpoint
+// Verify SMS OTP endpoint
 router.post('/verify-otp', async (req, res) => {
   try {
     const { mobileNumber, otp } = req.body;
@@ -300,34 +309,48 @@ router.post('/verify-otp', async (req, res) => {
       return res.status(400).json({ error: 'Mobile number and OTP are required' });
     }
     
-    const storedData = otpStore.get(mobileNumber);
+    // Clean mobile number
+    const cleanNumber = mobileNumber.replace(/\D/g, '');
     
-    if (!storedData) {
-      return res.status(400).json({ error: 'OTP not found or expired' });
+    if (cleanNumber.length !== 10) {
+      return res.status(400).json({ error: 'Invalid mobile number' });
     }
     
-    if (Date.now() > storedData.expiresAt) {
-      otpStore.delete(mobileNumber);
-      return res.status(400).json({ error: 'OTP expired' });
+    // Get session ID from store
+    const sessionData = sessionStore.get(cleanNumber);
+    
+    if (!sessionData) {
+      return res.status(400).json({ error: 'OTP session not found. Please request a new OTP.' });
     }
     
-    if (storedData.otp !== otp) {
-      return res.status(400).json({ error: 'Invalid OTP' });
+    // Check if session expired
+    if (Date.now() > sessionData.expiresAt) {
+      sessionStore.delete(cleanNumber);
+      return res.status(400).json({ error: 'OTP session expired. Please request a new OTP.' });
     }
     
-    // OTP verified successfully, remove from store
-    otpStore.delete(mobileNumber);
+    // Verify OTP with 2factor.in
+    const result = await smsService.verifyOTP(sessionData.sessionId, otp);
+    
+    if (!result.success) {
+      return res.status(400).json({ error: result.error || 'Invalid OTP' });
+    }
+    
+    // OTP verified successfully, remove session
+    sessionStore.delete(cleanNumber);
     
     res.json({
-      message: 'OTP verified successfully',
+      message: 'Mobile number verified successfully',
       verified: true
     });
     
   } catch (error) {
     console.error('Verify OTP error:', error);
-    res.status(500).json({ error: 'Failed to verify OTP' });
+    res.status(500).json({ error: 'Failed to verify OTP. Please try again.' });
   }
 });
+
+// ===== END SMS OTP ENDPOINTS =====
 
 // Delete account endpoint
 router.delete('/account', auth, async (req, res) => {
