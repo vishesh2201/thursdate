@@ -1241,7 +1241,19 @@ export default function ChatConversation() {
                                         searchPlaceHolder="Search emoji..."
                                         previewConfig={{ showPreview: false }}
                                         skinTonesDisabled
-                                        emojiStyle="native"
+                                        emojiStyle="apple"
+                                        lazyLoadEmojis={true}
+                                        categories={[
+                                            { category: 'suggested', name: 'Recently Used' },
+                                            { category: 'smileys_people', name: 'Smileys & People' },
+                                            { category: 'animals_nature', name: 'Animals & Nature' },
+                                            { category: 'food_drink', name: 'Food & Drink' },
+                                            { category: 'travel_places', name: 'Travel & Places' },
+                                            { category: 'activities', name: 'Activities' },
+                                            { category: 'objects', name: 'Objects' },
+                                            { category: 'symbols', name: 'Symbols' },
+                                            { category: 'flags', name: 'Flags' }
+                                        ]}
                                     />
                                 </div>
                             )}
