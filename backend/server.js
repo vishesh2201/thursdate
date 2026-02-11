@@ -12,9 +12,42 @@ const app = express();
 const server = http.createServer(app);
 
 // Configure Socket.IO with CORS
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:5173',
+  'http://localhost:5000'
+].filter(Boolean);
+
+// Add Vercel deployment URLs (including preview deployments)
+if (process.env.FRONTEND_URL && process.env.FRONTEND_URL.includes('vercel.app')) {
+  const vercelDomain = process.env.FRONTEND_URL.split('//')[1].split('.').slice(-2).join('.');
+  allowedOrigins.push(`https://*.${vercelDomain}`);
+}
+
+console.log('🔒 Allowed origins:', allowedOrigins);
+
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or server-to-server)
+      if (!origin) return callback(null, true);
+      
+      // Check if origin matches allowed origins or patterns
+      const isAllowed = allowedOrigins.some(allowed => {
+        if (allowed.includes('*')) {
+          const pattern = allowed.replace(/\*/g, '.*');
+          return new RegExp(`^${pattern}$`).test(origin);
+        }
+        return allowed === origin;
+      });
+      
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        console.warn('⚠️ CORS blocked origin:', origin);
+        callback(null, true); // Allow for now, but log warning
+      }
+    },
     methods: ["GET", "POST"],
     credentials: true
   }

@@ -11,13 +11,15 @@ const onlineUsers = new Map();
  */
 const initializeSocketHandlers = (io) => {
   io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.userId} (${socket.userEmail})`);
+    console.log(`✅ User connected: ${socket.userId} (${socket.userEmail})`);
     
     // Mark user as online
     onlineUsers.set(socket.userId, socket.id);
+    console.log(`👥 Online users: [${Array.from(onlineUsers.keys()).join(', ')}]`);
     
     // Broadcast user online status
     io.emit('user_status', { userId: socket.userId, isOnline: true });
+    console.log(`📡 Broadcasted online status for user ${socket.userId}`);
     
     // Join user to their personal room for targeted messages
     socket.join(`user:${socket.userId}`);
@@ -305,18 +307,21 @@ const initializeSocketHandlers = (io) => {
     // Handle user status request
     socket.on('request_user_status', (userId) => {
       const isOnline = onlineUsers.has(userId);
+      console.log(`🔍 User ${socket.userId} requested status of user ${userId}: ${isOnline ? 'online' : 'offline'}`);
       socket.emit('user_status', { userId, isOnline });
     });
     
     // Handle disconnection
     socket.on('disconnect', () => {
-      console.log(`User disconnected: ${socket.userId}`);
+      console.log(`❌ User disconnected: ${socket.userId}`);
       
       // Mark user as offline
       onlineUsers.delete(socket.userId);
+      console.log(`👥 Online users: [${Array.from(onlineUsers.keys()).join(', ')}]`);
       
       // Broadcast user offline status
       io.emit('user_status', { userId: socket.userId, isOnline: false });
+      console.log(`📡 Broadcasted offline status for user ${socket.userId}`);
     });
   });
 };
