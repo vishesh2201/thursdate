@@ -86,14 +86,6 @@ export default function LevelUpPopup({ show, type, action, partnerName, onFillIn
                                 </div>
                             </>
                         )}
-
-                        {/* ✅ NO_ACTION / Invalid - should not happen */}
-                        {!shouldShowFillInfo && !shouldShowConsent && (
-                            <div className="text-white text-sm text-center py-2">
-                                <p>⚠️ Debug: Invalid action</p>
-                                <p className="text-xs mt-1">Action: {action || 'undefined'}</p>
-                            </div>
-                        )}
                     </div>
                 </motion.div>
             )}

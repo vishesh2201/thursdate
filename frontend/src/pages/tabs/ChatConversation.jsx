@@ -70,11 +70,26 @@ export default function ChatConversation() {
             socketService.connect(token);
         }
 
-        // Join conversation room (with slight delay to ensure socket is ready)
-        setTimeout(() => {
-            console.log('Joining conversation room:', conversationId, 'Socket connected:', socketService.isConnected());
-            socketService.joinConversation(conversationId);
-        }, 100);
+        // Wait for socket to be connected, then join and request status
+        const waitForConnection = () => {
+            if (socketService.isConnected()) {
+                console.log('✅ Socket connected, joining conversation:', conversationId);
+                socketService.joinConversation(conversationId);
+                // Request user status after socket is connected
+                socketService.requestUserStatus(otherUser.id);
+            } else {
+                console.log('⏳ Waiting for socket connection...');
+                setTimeout(waitForConnection, 200);
+            }
+        };
+        waitForConnection();
+
+        // Poll user status every 30 seconds to keep it fresh
+        const statusPollInterval = setInterval(() => {
+            if (socketService.isConnected()) {
+                socketService.requestUserStatus(otherUser.id);
+            }
+        }, 30000);
 
         // Listen for new messages
         socketService.onNewMessage(({ conversationId: msgConvId, message: newMsg }) => {
@@ -129,13 +144,18 @@ export default function ChatConversation() {
 
         // Listen for user status changes
         socketService.onUserStatus(({ userId, isOnline: online }) => {
+            console.log('👤 User status update:', userId, 'online:', online, '(otherUser:', otherUser.id, ')');
             if (userId === otherUser.id) {
                 setIsOnline(online);
             }
         });
 
-        // Request current status of other user
-        socketService.requestUserStatus(otherUser.id);
+        // Listen for socket reconnection to re-request status
+        socketService.on('connect', () => {
+            console.log('♻️ Socket reconnected, re-requesting user status');
+            socketService.joinConversation(conversationId);
+            socketService.requestUserStatus(otherUser.id);
+        });
 
         // Listen for message deletions
         socketService.on('message_deleted', (data) => {
@@ -185,14 +205,18 @@ export default function ChatConversation() {
                 loadLevelStatus();
             }
         });
-
-        // ✅ Load initial level status
-        loadLevelStatus();
-
-        return () => {
+// Clear status poll interval
+            clearInterval(statusPollInterval);
+            
             socketService.leaveConversation(conversationId);
             socketService.off('new_message');
             socketService.off('user_typing');
+            socketService.off('messages_read');
+            socketService.off('message_delivered');
+            socketService.off('user_status');
+            socketService.off('message_deleted');
+            socketService.off('conversation_unmatched');
+            socketService.off('connect
             socketService.off('messages_read');
             socketService.off('message_delivered');
             socketService.off('user_status');
@@ -1001,11 +1025,12 @@ export default function ChatConversation() {
 
             {/* Input Area */}
             <div className="bg-gradient-to-t from-black/60 to-transparent px-4 py-4 pb-8 z-10 relative">
-                {/* ✅ Level Up Popups - Only show if NOT declined temporarily */}
+                {/* ✅ Level Up Popups - Only show if NOT declined temporarily AND has valid action */}
                 <LevelUpPopup
                     show={
                         levelStatus?.level2PopupPending === true && 
-                        levelStatus?.level2ConsentState !== 'DECLINED_TEMPORARY'
+                        levelStatus?.level2ConsentState !== 'DECLINED_TEMPORARY' &&
+                        (levelStatus?.level2Action === 'FILL_INFORMATION' || levelStatus?.level2Action === 'ASK_CONSENT')
                     }
                     type="LEVEL_2"
                     action={levelStatus?.level2Action}
@@ -1018,7 +1043,8 @@ export default function ChatConversation() {
                 <LevelUpPopup
                     show={
                         levelStatus?.level3PopupPending === true && 
-                        levelStatus?.level3ConsentState !== 'DECLINED_TEMPORARY'
+                        levelStatus?.level3ConsentState !== 'DECLINED_TEMPORARY' &&
+                        (levelStatus?.level3Action === 'FILL_INFORMATION' || levelStatus?.level3Action === 'ASK_CONSENT')
                     }
                     type="LEVEL_3"
                     action={levelStatus?.level3Action}
