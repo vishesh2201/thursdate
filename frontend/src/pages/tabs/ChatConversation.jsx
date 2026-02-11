@@ -5,7 +5,6 @@ import socketService from '../../utils/socket';
 import LevelUpPopup from './LevelUpPopup';
 import Level2UnlockedPopup from './Level2UnlockedPopup';
 import ConsentReminderBanner from '../../components/ConsentReminderBanner';
-import EmojiPicker from 'emoji-picker-react';
 
 export default function ChatConversation() {
     const navigate = useNavigate();
@@ -29,10 +28,8 @@ export default function ChatConversation() {
     const [showReportDialog, setShowReportDialog] = useState(false);
     const [reportReason, setReportReason] = useState('');
     const [reportDescription, setReportDescription] = useState('');
-    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const menuRef = useRef(null);
     const messagesEndRef = useRef(null);
-    const emojiPickerRef = useRef(null);
     const typingTimeoutRef = useRef(null);
     const mediaRecorderRef = useRef(null);
     const audioChunksRef = useRef([]);
@@ -462,23 +459,6 @@ export default function ChatConversation() {
         }
     };
 
-    const onEmojiClick = (emojiData, event) => {
-        // Prevent event from bubbling to close the picker immediately
-        if (event) {
-            event.stopPropagation();
-        }
-        
-        setMessage(prev => prev + emojiData.emoji);
-        
-        // Close picker on mobile after selection for better UX
-        const isMobile = window.innerWidth < 768;
-        if (isMobile) {
-            setTimeout(() => setShowEmojiPicker(false), 100);
-        }
-        
-        inputRef.current?.focus();
-    };
-
     const handleTyping = (e) => {
         setMessage(e.target.value);
 
@@ -810,29 +790,22 @@ export default function ChatConversation() {
 
 
 
-    // Close menu and emoji picker when clicking outside
+    // Close menu when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (menuRef.current && !menuRef.current.contains(event.target)) {
                 setShowMenu(false);
             }
-            if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target)) {
-                // Don't close if clicking the emoji button itself
-                const emojiButton = event.target.closest('button');
-                if (!emojiButton || !emojiButton.querySelector('svg path[d*="M14.828"]')) {
-                    setShowEmojiPicker(false);
-                }
-            }
         };
 
-        if (showMenu || showEmojiPicker) {
+        if (showMenu) {
             document.addEventListener('mousedown', handleClickOutside);
         }
 
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [showMenu, showEmojiPicker]);
+    }, [showMenu]);
 
 
 
@@ -1233,48 +1206,13 @@ export default function ChatConversation() {
                             </button>
                         </>
                     ) : (
-                        /* Normal Mode with emoji picker */
+                        /* Normal Mode */
                         <>
-                            {/* Emoji Picker - WhatsApp Style */}
-                            {showEmojiPicker && (
-                                <div 
-                                    ref={emojiPickerRef}
-                                    className="absolute bottom-20 left-4 z-50 shadow-2xl rounded-2xl overflow-hidden"
-                                    style={{ 
-                                        maxWidth: 'calc(100vw - 2rem)',
-                                        width: '350px'
-                                    }}
-                                >
-                                    <EmojiPicker
-                                        onEmojiClick={onEmojiClick}
-                                        width="100%"
-                                        height="400px"
-                                        theme="light"
-                                        searchPlaceHolder="Search emoji..."
-                                        previewConfig={{ showPreview: false }}
-                                        skinTonesDisabled
-                                        emojiStyle="apple"
-                                        lazyLoadEmojis={true}
-                                        categories={[
-                                            { category: 'suggested', name: 'Recently Used' },
-                                            { category: 'smileys_people', name: 'Smileys & People' },
-                                            { category: 'animals_nature', name: 'Animals & Nature' },
-                                            { category: 'food_drink', name: 'Food & Drink' },
-                                            { category: 'travel_places', name: 'Travel & Places' },
-                                            { category: 'activities', name: 'Activities' },
-                                            { category: 'objects', name: 'Objects' },
-                                            { category: 'symbols', name: 'Symbols' },
-                                            { category: 'flags', name: 'Flags' }
-                                        ]}
-                                    />
-                                </div>
-                            )}
-
                             <div className="flex-1 bg-white rounded-full px-4 py-3 flex items-center gap-2">
-                                {/* Emoji Button */}
+                                {/* Emoji Button - Opens native keyboard */}
                                 <button
                                     type="button"
-                                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                                    onClick={() => inputRef.current?.focus()}
                                     className="flex-shrink-0 hover:scale-110 transition-transform"
                                 >
                                     <svg className="w-6 h-6 text-gray-500 hover:text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
