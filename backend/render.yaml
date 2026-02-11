@@ -1,0 +1,43 @@
+services:
+  # Backend API Service
+  - type: web
+    name: thursdate-backend
+    runtime: node
+    env: node
+    region: oregon # Change to your preferred region
+    plan: free # free tier, upgrade to starter ($7/mo) for production
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DB_HOST
+        sync: false # Set manually in Render dashboard
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: DB_PORT
+        value: 3306
+      - key: JWT_SECRET
+        generateValue: true # Render will auto-generate
+      - key: FRONTEND_URL
+        value: https://thursdate.vercel.app # Update with your Vercel URL
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false
+
+# Note: 
+# - Set 'sync: false' variables manually in Render Dashboard
+# - Update FRONTEND_URL after deploying to Vercel
+# - Free tier sleeps after 15 min of inactivity (upgrade to starter for 24/7)
