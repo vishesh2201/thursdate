@@ -208,7 +208,12 @@ export default function ChatConversation() {
                 loadLevelStatus();
             }
         });
-// Clear status poll interval
+
+        // ✅ Load initial level status
+        loadLevelStatus();
+
+        return () => {
+            // Clear status poll interval
             clearInterval(statusPollInterval);
             
             socketService.leaveConversation(conversationId);
@@ -219,12 +224,7 @@ export default function ChatConversation() {
             socketService.off('user_status');
             socketService.off('message_deleted');
             socketService.off('conversation_unmatched');
-            socketService.off('connect
-            socketService.off('messages_read');
-            socketService.off('message_delivered');
-            socketService.off('user_status');
-            socketService.off('message_deleted');
-            socketService.off('conversation_unmatched');
+            socketService.off('connect');
             socketService.off('level_threshold_reached');
             socketService.off('level2_unlocked');
             socketService.off('level3_unlocked');
