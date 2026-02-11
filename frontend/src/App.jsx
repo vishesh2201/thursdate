@@ -18,6 +18,8 @@ import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminWaitlist from "./pages/admin/AdminWaitlist";
 import AdminUsers from "./pages/admin/AdminUsers";
+import AdminReports from "./pages/admin/AdminReports";
+import AdminReportDetails from "./pages/admin/AdminReportDetails";
 import AgePreference from "./pages/settings/AgePreferencePage";
 import GenderPreference from "./pages/settings/GenderPreferencePage";
 import DirectRequests from "./pages/settings/DirectRequestsPage";
@@ -71,6 +73,8 @@ export default function App() {
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/waitlist" element={<AdminWaitlist />} />
         <Route path="/admin/users" element={<AdminUsers />} />
+        <Route path="/admin/reports" element={<AdminReports />} />
+        <Route path="/admin/reports/:reportId" element={<AdminReportDetails />} />
 
         {/* Settings Routes */}
         <Route path="/settings/age-preference" element={<AgePreference />} />

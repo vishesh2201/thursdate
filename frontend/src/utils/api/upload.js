@@ -79,9 +79,19 @@ export const uploadAPI = {
     uploadFacePhoto: async (file) => {
         if (isMockMode()) {
             console.log("MOCK UPLOAD: Simulating face photo upload.");
-            const tempUrl = URL.createObjectURL(file);
+            // ✅ FIX: Use placeholder images instead of blob URLs
+            // Blob URLs don't work when viewed by other users or after refresh
+            const placeholders = [
+                'https://randomuser.me/api/portraits/men/1.jpg',
+                'https://randomuser.me/api/portraits/men/2.jpg',
+                'https://randomuser.me/api/portraits/men/3.jpg',
+                'https://randomuser.me/api/portraits/women/1.jpg',
+                'https://randomuser.me/api/portraits/women/2.jpg',
+                'https://randomuser.me/api/portraits/women/3.jpg',
+            ];
+            const randomPlaceholder = placeholders[Math.floor(Math.random() * placeholders.length)];
             await new Promise(resolve => setTimeout(resolve, 500)); // Simulate delay
-            return { url: tempUrl };
+            return { url: randomPlaceholder };
         }
 
         // LIVE MODE: Proceed with actual backend call

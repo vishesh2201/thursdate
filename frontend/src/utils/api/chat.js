@@ -192,4 +192,26 @@ export const chatAPI = {
             body: JSON.stringify({ consent }),
         });
     },
+
+    // Report user
+    reportUser: async (reportedUserId, conversationId, reason, description) => {
+        if (isMockMode()) {
+            console.log("MOCK MODE: Simulating user report.");
+            return { 
+                success: true, 
+                message: 'Thanks for reporting. Our team will review this.',
+                reportId: Date.now()
+            };
+        }
+        
+        return authRequest('/report-user', {
+            method: 'POST',
+            body: JSON.stringify({ 
+                reportedUserId, 
+                conversationId, 
+                reason, 
+                description 
+            }),
+        });
+    },
 };

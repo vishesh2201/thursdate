@@ -314,9 +314,9 @@ export default function UserIntent() {
           lifestyleImageUrls,
         },
         profileImageUrl,
-        onboardingComplete: false, // Still not complete - need to do ProfileQuestions
+        onboardingComplete: true, // ✅ Onboarding complete - navigate to Home
       });
-      navigate('/profile-questions');
+      navigate('/');
     } catch (err) {
       console.error('Save failed', err);
       alert('Failed to save. ' + (err.message || ''));

@@ -188,8 +188,8 @@ router.post('/face-photo', auth, upload.single('image'), async (req, res) => {
       folder: 'luyona/face-photos',
       public_id: `user_${req.user.userId}_face_${Date.now()}`,
       transformation: [
-        { width: 600, height: 600, crop: 'fill', gravity: 'face' },
-        { quality: 'auto' }
+        { width: 1600, height: 1600, crop: 'fill', gravity: 'face' },
+        { quality: 'auto:best' }
       ]
     });
 

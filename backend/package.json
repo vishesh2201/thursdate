@@ -16,6 +16,7 @@
   "type": "commonjs",
   "description": "",
   "dependencies": {
+    "@aws-sdk/client-rekognition": "^3.983.0",
     "axios": "^1.13.2",
     "bcrypt": "^6.0.0",
     "cloudinary": "^2.7.0",
@@ -27,6 +28,8 @@
     "multer": "^2.0.2",
     "mysql2": "^3.14.3",
     "node-cron": "^3.0.3",
+    "nodemailer": "^8.0.0",
+    "passport": "^0.7.0",
     "socket.io": "^4.8.3"
   }
 }

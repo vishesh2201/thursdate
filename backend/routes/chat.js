@@ -363,8 +363,8 @@ router.post('/conversations/:conversationId/messages', auth, async (req, res) =>
       [parseInt(conversationId)]
     );
     
-    // ✅ Track message count and check for level upgrades
-    const levelUpdate = await profileLevelService.incrementMessageCount(parseInt(conversationId));
+    // ✅ Track message count and check for level upgrades (requires both users to participate)
+    const levelUpdate = await profileLevelService.incrementMessageCount(parseInt(conversationId), userId);
     
     // Track first message and replies for match expiry system
     const isFirstMessage = await matchExpiryService.recordFirstMessage(parseInt(conversationId), userId);

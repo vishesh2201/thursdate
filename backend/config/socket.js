@@ -203,8 +203,8 @@ const initializeSocketHandlers = (io) => {
         
         console.log(`Message ${savedMessage.id} sent from user ${userId} to user ${otherUserId} (status: ${savedMessage.status})`);
         
-        // ✅ Track message count and check for level upgrades
-        const levelUpdate = await profileLevelService.incrementMessageCount(parseInt(conversationId));
+        // ✅ Track message count and check for level upgrades (requires both users to participate)
+        const levelUpdate = await profileLevelService.incrementMessageCount(parseInt(conversationId), userId);
         console.log('[Level Socket] Message count:', levelUpdate.messageCount, 'Threshold:', levelUpdate.threshold);
         
         // Track first message and replies for match expiry system

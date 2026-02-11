@@ -215,6 +215,7 @@ const recordMessage = async (conversationId, senderId) => {
 
 /**
  * Get match level info for a conversation
+ * ✅ UPDATED: Now returns consent state for reminder banner
  */
 const getMatchLevelInfo = async (conversationId, requestingUserId) => {
   try {
@@ -242,12 +243,16 @@ const getMatchLevelInfo = async (conversationId, requestingUserId) => {
       level2: {
         iShared: isUser1 ? ml.level2_shared_by_user1 : ml.level2_shared_by_user2,
         theyShared: isUser1 ? ml.level2_shared_by_user2 : ml.level2_shared_by_user1,
-        popupPending: isUser1 ? ml.level2_popup_pending_user1 : ml.level2_popup_pending_user2
+        popupPending: isUser1 ? ml.level2_popup_pending_user1 : ml.level2_popup_pending_user2,
+        // ✅ NEW: Return my consent state for banner logic
+        myConsentState: isUser1 ? ml.level2_user1_consent_state : ml.level2_user2_consent_state
       },
       level3: {
         iShared: isUser1 ? ml.level3_shared_by_user1 : ml.level3_shared_by_user2,
         theyShared: isUser1 ? ml.level3_shared_by_user2 : ml.level3_shared_by_user1,
-        popupPending: isUser1 ? ml.level3_popup_pending_user1 : ml.level3_popup_pending_user2
+        popupPending: isUser1 ? ml.level3_popup_pending_user1 : ml.level3_popup_pending_user2,
+        // ✅ NEW: Return my consent state for banner logic
+        myConsentState: isUser1 ? ml.level3_user1_consent_state : ml.level3_user2_consent_state
       }
     };
   } catch (error) {
@@ -258,6 +263,7 @@ const getMatchLevelInfo = async (conversationId, requestingUserId) => {
 
 /**
  * Update consent/sharing status
+ * ✅ FIXED: "NO" now sets DECLINED_TEMPORARY instead of permanent rejection
  */
 const updateConsent = async (conversationId, userId, level, consent) => {
   try {
@@ -273,24 +279,38 @@ const updateConsent = async (conversationId, userId, level, consent) => {
     const ml = matchLevels[0];
     const isUser1 = userId === ml.user_id_1;
     
-    // Update sharing status
+    // ✅ NEW: Use consent_state columns with 3 states
+    const consentStateField = level === 2 
+      ? (isUser1 ? 'level2_user1_consent_state' : 'level2_user2_consent_state')
+      : (isUser1 ? 'level3_user1_consent_state' : 'level3_user2_consent_state');
+    
+    // ✅ BACKWARD COMPATIBILITY: Also update old boolean columns
     const shareField = level === 2 
       ? (isUser1 ? 'level2_shared_by_user1' : 'level2_shared_by_user2')
       : (isUser1 ? 'level3_shared_by_user1' : 'level3_shared_by_user2');
     
-    // Clear popup pending
+    // ✅ CRITICAL FIX: Clear popup only on YES, keep pending=TRUE on NO for persistent reminder
     const popupField = level === 2
       ? (isUser1 ? 'level2_popup_pending_user1' : 'level2_popup_pending_user2')
       : (isUser1 ? 'level3_popup_pending_user1' : 'level3_popup_pending_user2');
     
+    // ✅ YES = ACCEPTED, NO = DECLINED_TEMPORARY (not permanent!)
+    const consentState = consent ? 'ACCEPTED' : 'DECLINED_TEMPORARY';
+    
+    // ✅ Clear popup only on YES
+    const clearPopup = consent === true;
+    
     await pool.execute(
       `UPDATE match_levels 
-       SET ${shareField} = ?, ${popupField} = FALSE 
+       SET ${consentStateField} = ?, 
+           ${shareField} = ?, 
+           ${popupField} = ? 
        WHERE conversation_id = ?`,
-      [consent, conversationId]
+      [consentState, consent, !clearPopup, conversationId]
     );
     
-    console.log(`[MatchLevels] User ${userId} ${consent ? 'shared' : 'declined'} Level ${level} for conversation ${conversationId}`);
+    console.log(`[MatchLevels] User ${userId} ${consent ? 'ACCEPTED' : 'DECLINED_TEMPORARY'} Level ${level} for conversation ${conversationId}`);
+    console.log(`[MatchLevels] Popup pending now: ${!clearPopup} (reminder banner will show if NO was clicked)`);
     
     return true;
   } catch (error) {

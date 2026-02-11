@@ -205,6 +205,7 @@ router.get('/profile/:userId', auth, async (req, res) => {
                     filteredProfile.visibilityLevel = visibility.level;
                     filteredProfile.canUpgrade = visibility.canUpgrade;
                     filteredProfile.nextLevelAt = visibility.nextLevelAt;
+                    filteredProfile.personalTabUnlocked = visibility.personalTabUnlocked; // ✅ NEW: Personal tab lock state
                     
                     return res.json(filteredProfile);
                 } catch (levelError) {

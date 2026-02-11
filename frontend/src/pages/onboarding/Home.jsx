@@ -91,6 +91,9 @@ export default function Home() {
     });
 
     return () => {
+      // Clean up listeners to prevent duplicates
+      socketService.off('new_message');
+      socketService.off('messages_read');
       // Don't disconnect on unmount, keep socket alive
       // socketService.disconnect();
     };

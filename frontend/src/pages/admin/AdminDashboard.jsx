@@ -146,6 +146,19 @@ export default function AdminDashboard() {
           {/* Navigation Cards */}
           <div className="space-y-4">
             <button
+              onClick={() => navigate('/admin/reports')}
+              className="w-full bg-red-500 text-white p-4 rounded-xl text-left hover:bg-red-600 transition-colors"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-semibold">User Reports</div>
+                  <div className="text-sm opacity-90">Review reported users and take action</div>
+                </div>
+                <div className="text-2xl">→</div>
+              </div>
+            </button>
+
+            <button
               onClick={() => navigate('/admin/waitlist')}
               className="w-full bg-yellow-500 text-white p-4 rounded-xl text-left hover:bg-yellow-600 transition-colors"
             >

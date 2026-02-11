@@ -13,17 +13,28 @@ export default function UserProfileInfo() {
     // Lifestyle image carousel state
     const [isMinimized, setIsMinimized] = useState(false);
     const [currentLifestyleImageIndex, setCurrentLifestyleImageIndex] = useState(0);
+    const [currentPersonalImageIndex, setCurrentPersonalImageIndex] = useState(0);
     const [touchStart, setTouchStart] = useState(0);
     const [scrollTop, setScrollTop] = useState(0);
     const [viewMode, setViewMode] = useState('lifestyle');
 
-    // Define loadUserProfile before useEffects
     const loadUserProfile = async () => {
         try {
             setLoading(true);
             const data = await userAPI.getUserProfile(userId, conversationId);
             setUser(data);
             console.log('[Profile] Loaded profile, visibility level:', data.visibilityLevel);
+            console.log('[Profile] Conversation ID:', conversationId);
+            console.log('[Profile] Personal tab unlocked:', data.personalTabUnlocked);
+            console.log('[Profile] Face photos count:', data.facePhotos ? data.facePhotos.length : 'null/undefined');
+            if (data.facePhotos && data.facePhotos.length > 0) {
+                console.log('[Profile] Face photos:', data.facePhotos);
+            }
+            
+            // If no conversationId, Personal tab should default to locked
+            if (!conversationId) {
+                console.log('[Profile] No conversation ID - Personal tab will be locked');
+            }
         } catch (error) {
             console.error('Failed to load user profile:', error);
             navigate(-1);
@@ -123,10 +134,13 @@ export default function UserProfileInfo() {
         }
     };
 
-    // Tap background to cycle through lifestyle images
+    // Tap background to cycle through images based on current tab
     const handleBackgroundTap = () => {
-        if (lifestyleImages.length === 0) return;
-        setCurrentLifestyleImageIndex((prev) => (prev + 1) % lifestyleImages.length);
+        if (viewMode === 'lifestyle' && lifestyleImages.length > 0) {
+            setCurrentLifestyleImageIndex((prev) => (prev + 1) % lifestyleImages.length);
+        } else if (viewMode === 'personal' && user?.personalTabUnlocked && user?.facePhotos && user.facePhotos.length > 0) {
+            setCurrentPersonalImageIndex((prev) => (prev + 1) % user.facePhotos.length);
+        }
     };
 
     return (
@@ -134,14 +148,18 @@ export default function UserProfileInfo() {
             className="h-screen overflow-hidden flex flex-col"
             onClick={handleBackgroundTap}
             style={{
-                backgroundImage: lifestyleImages.length > 0
+                backgroundImage: viewMode === 'lifestyle' && lifestyleImages.length > 0
                     ? `linear-gradient(rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.35)), url(${lifestyleImages[currentLifestyleImageIndex]})`
+                    : viewMode === 'personal' && user?.personalTabUnlocked && user?.facePhotos && user.facePhotos.length > 0
+                    ? `linear-gradient(rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.15)), url(${user.facePhotos[currentPersonalImageIndex]})`
                     : `linear-gradient(rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.35)), url('/bgs/faceverifybg.png')`,
-                backgroundSize: 'cover',
+                backgroundSize: viewMode === 'personal' && user?.personalTabUnlocked && user?.facePhotos && user.facePhotos.length > 0 ? 'contain' : 'cover',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
                 transition: 'background-image 0.3s ease-in-out',
-                cursor: lifestyleImages.length > 0 ? 'pointer' : 'default'
+                cursor: (viewMode === 'lifestyle' && lifestyleImages.length > 0) || 
+                        (viewMode === 'personal' && user?.personalTabUnlocked && user?.facePhotos && user.facePhotos.length > 0)
+                        ? 'pointer' : 'default'
             }}
         >
             {/* Top Bar */}
@@ -167,9 +185,11 @@ export default function UserProfileInfo() {
                                 }`}
                         >
                             Personal
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                            </svg>
+                            {!user?.personalTabUnlocked && (
+                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                                </svg>
+                            )}
                         </button>
                     </div>
                 ) : (
@@ -178,8 +198,8 @@ export default function UserProfileInfo() {
                 <div style={{ width: 40 }}></div>
             </div>
 
-            {/* Lifestyle Image Indicators */}
-            {lifestyleImages.length > 1 && (
+            {/* Image Indicators - Show on Lifestyle or Personal tab */}
+            {viewMode === 'lifestyle' && lifestyleImages.length > 1 && (
                 <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex gap-2 z-10">
                     {lifestyleImages.map((_, idx) => (
                         <div
@@ -188,6 +208,20 @@ export default function UserProfileInfo() {
                             style={{
                                 width: idx === currentLifestyleImageIndex ? '24px' : '8px',
                                 backgroundColor: idx === currentLifestyleImageIndex ? 'white' : 'rgba(255, 255, 255, 0.5)'
+                            }}
+                        />
+                    ))}
+                </div>
+            )}
+            {viewMode === 'personal' && user?.personalTabUnlocked && user?.facePhotos && user.facePhotos.length > 1 && (
+                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex gap-2 z-10">
+                    {user.facePhotos.map((_, idx) => (
+                        <div
+                            key={idx}
+                            className="h-1 rounded-full transition-all"
+                            style={{
+                                width: idx === currentPersonalImageIndex ? '24px' : '8px',
+                                backgroundColor: idx === currentPersonalImageIndex ? 'white' : 'rgba(255, 255, 255, 0.5)'
                             }}
                         />
                     ))}
@@ -283,7 +317,7 @@ export default function UserProfileInfo() {
                             <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30">
                                 <img src="/profileHeight.svg" alt="Height" className="w-6 h-6" />
                             </div>
-                            <span className="text-white/80 text-[10px] mt-1">{user.bodyType || 'Not specified'}</span>
+                            <span className="text-white/80 text-[10px] mt-1">{user.height ? `${user.height} cm` : 'Not specified'}</span>
                         </div>
 
                         <div className="flex flex-col items-center">
@@ -312,8 +346,12 @@ export default function UserProfileInfo() {
                         </div>
                     </div>
 
-                    {/* Bio Section */}
-                    <div className="flex flex-col gap-3 -mt-4" style={{ width: '336px' }}>
+                    {/* ✅ CONDITIONAL RENDERING: Show Lifestyle or Personal tab based on viewMode */}
+                    {viewMode === 'lifestyle' ? (
+                        /* LIFESTYLE TAB CONTENT */
+                        <>
+                            {/* Bio Section */}
+                            <div className="flex flex-col gap-3 -mt-4" style={{ width: '336px' }}>
                         <h3 className="font-['Poppins'] font-semibold text-[16px] leading-[1.3] text-[#f2f2f2]">Bio</h3>
                         <div className="bg-white/10 rounded-xl px-3 py-[18px] flex flex-col gap-[5px]">
                             {/* Read/Listen Segmented Control */}
@@ -476,7 +514,7 @@ export default function UserProfileInfo() {
                     )}
 
                     {/* Lifestyle Section */}
-                    {(user.favouriteTravelDestination || user.pets || user.foodPreference || user.intent?.profileQuestions?.sleepSchedule || user.drinking || user.smoking) && (
+                    {(user.favouriteTravelDestination || user.pets || user.height || user.foodPreference || user.intent?.profileQuestions?.sleepSchedule || user.drinking || user.smoking) && (
                         <div className="mb-4">
                             <h3 className="text-white text-base font-semibold mb-3">Lifestyle</h3>
 
@@ -502,6 +540,18 @@ export default function UserProfileInfo() {
                                             <div>
                                                 <div className="text-white/70 text-xs">Pet Preference</div>
                                                 <div className="text-white font-medium text-sm">{user.pets}</div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {user.height && (
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center flex-shrink-0 border border-white/30">
+                                                <img src="/profileHeight.svg" alt="Height" className="w-4 h-4" />
+                                            </div>
+                                            <div>
+                                                <div className="text-white/70 text-xs">Height</div>
+                                                <div className="text-white font-medium text-sm">{user.height} cm</div>
                                             </div>
                                         </div>
                                     )}
@@ -597,7 +647,7 @@ export default function UserProfileInfo() {
                     )}
 
                     {/* Deep Dive Section */}
-                    {(user.kidsPreference || user.religiousLevel || user.intent?.profileQuestions?.livingSituation) && (
+                    {(user.kidsPreference || user.religiousLevel || user.intent?.profileQuestions?.religion || user.intent?.profileQuestions?.livingSituation) && (
                         <div className="flex flex-col gap-3" style={{ width: '336px' }}>
                             <h3 className="font-['Poppins'] font-semibold text-[16px] leading-[1.3] text-[#f2f2f2]">Deep Dive</h3>
                             <div className="bg-white/10 rounded-xl px-3 py-[18px] flex flex-col gap-3">
@@ -615,7 +665,7 @@ export default function UserProfileInfo() {
                                         </div>
                                     </div>
                                 )}
-                                {user.religiousLevel && (
+                                {user.religiousLevel && user.religiousLevel !== 'not' && (
                                     <div className="flex gap-[11px] items-center" style={{ width: '312px' }}>
                                         <div className="bg-white/10 rounded-full flex items-center justify-center shrink-0" style={{ width: '38px', height: '38px' }}>
                                             <svg className="text-white" style={{ width: '19px', height: '19px' }} viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -624,7 +674,24 @@ export default function UserProfileInfo() {
                                         </div>
                                         <div className="flex flex-col gap-[2px]" style={{ width: '123px' }}>
                                             <p className="font-['Poppins'] font-semibold text-[14px] leading-[1.4] text-white">Religious view</p>
-                                            <p className="font-['Poppins'] text-[14px] leading-[1.4] text-white">{user.religiousLevel}</p>
+                                            <p className="font-['Poppins'] text-[14px] leading-[1.4] text-white">
+                                                {user.religiousLevel === 'moderately' ? 'Moderately religious' : 
+                                                 user.religiousLevel === 'deeply' ? 'Deeply religious' : 
+                                                 user.religiousLevel}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                                {user.intent?.profileQuestions?.religion && (
+                                    <div className="flex gap-[11px] items-center" style={{ width: '312px' }}>
+                                        <div className="bg-white/10 rounded-full flex items-center justify-center shrink-0" style={{ width: '38px', height: '38px' }}>
+                                            <svg className="text-white" style={{ width: '19px', height: '19px' }} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                                <path d="M12 2C8.5 7 5.5 11.5 5.5 15.5a6.5 6.5 0 1 0 13 0C18.5 11.5 15.5 7 12 2z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                            </svg>
+                                        </div>
+                                        <div className="flex flex-col gap-[2px]" style={{ width: '123px' }}>
+                                            <p className="font-['Poppins'] font-semibold text-[14px] leading-[1.4] text-white">Religion</p>
+                                            <p className="font-['Poppins'] text-[14px] leading-[1.4] text-white">{user.intent.profileQuestions.religion}</p>
                                         </div>
                                     </div>
                                 )}
@@ -666,6 +733,61 @@ export default function UserProfileInfo() {
                     )}
 
                     <div className="h-6"></div>
+                        </>
+                    ) : (
+                        /* PERSONAL TAB CONTENT */
+                        <div className="w-full">
+                            {user?.personalTabUnlocked ? (
+                                /* UNLOCKED: Photos shown as background - just show message */
+                                <div className="flex flex-col gap-4 w-full py-8">
+                                    <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/30 text-center">
+                                        <h3 className="font-['Poppins'] font-semibold text-[18px] leading-[1.3] text-white mb-2">
+                                            Personal Photos Unlocked! 🎉
+                                        </h3>
+                                        <p className="text-white/80 text-sm">
+                                            {user.facePhotos && user.facePhotos.length > 1 
+                                                ? `Tap the background to view all ${user.facePhotos.length} photos`
+                                                : 'Background shows personal photo'}
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : (
+                                /* LOCKED: Show lock screen with message */
+                                <div className="flex flex-col items-center justify-center py-20 px-6">
+                                    <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/30 max-w-sm text-center">
+                                        {/* Lock Icon */}
+                                        <div className="w-20 h-20 mx-auto mb-6 bg-white/20 rounded-full flex items-center justify-center">
+                                            <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                                            </svg>
+                                        </div>
+                                        
+                                        {/* Title */}
+                                        <h3 className="font-['Poppins'] font-semibold text-[20px] leading-[1.3] text-white mb-3">
+                                            Personal Photos Locked
+                                        </h3>
+                                        
+                                        {/* Message */}
+                                        <p className="font-['Poppins'] text-[14px] leading-[1.5] text-white/80 mb-2">
+                                            Unlock Level 3 for seeing personal photos
+                                        </p>
+                                        
+                                        {/* Progress Indicator */}
+                                        <div className="mt-6 pt-6 border-t border-white/20">
+                                            <div className="flex items-center justify-center gap-2 text-white/60 text-xs">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                                </svg>
+                                                <span>Keep chatting to unlock</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            <div className="h-6"></div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

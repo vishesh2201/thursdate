@@ -34,7 +34,8 @@ class ProfileLevelService {
         LEVEL_3: [
             'kidsPreference', 'facePhotos', 
             'favouriteTravelDestination', 'lastHolidayPlaces',
-            'favouritePlacesToGo', 'instagram', 'linkedin'
+            'favouritePlacesToGo', 'instagram', 'linkedin',
+            'religion', 'relationshipValues'
         ]
     };
 
@@ -127,61 +128,151 @@ class ProfileLevelService {
             nextLevelAt = this.THRESHOLDS.LEVEL_3 - messageCount;
         }
 
+        // ✅ PERSONAL TAB UNLOCK: Only unlocked when Level 3 FULLY unlocked (both consented AND completed)
+        const personalTabUnlocked = !!(messageCount >= this.THRESHOLDS.LEVEL_3 && 
+                                       viewer_level3_consent && 
+                                       owner_level3_consent &&
+                                       conv.viewer_level3_completed &&
+                                       conv.owner_level3_completed);
+
         return {
             level: visibleLevel,
             canUpgrade,
             nextLevelAt,
             messageCount,
             level2Ready: conv.viewer_level2_done && conv.owner_level2_done,
-            level3Ready: conv.viewer_level3_consent && conv.owner_level3_consent
+            level3Ready: conv.viewer_level3_consent && conv.owner_level3_consent,
+            personalTabUnlocked  // ✅ NEW: Flag for Personal tab lock/unlock state
         };
     }
 
     /**
      * Increment message count and check for level upgrades
+     * ✅ CRITICAL FIX: Requires BOTH users to participate in conversation
+     * - Tracks per-user message counts (user1_message_count, user2_message_count)
+     * - Level 2 triggers at TOTAL message count >= 5 AND both users sent >= 1 message
+     * - Level 3 triggers at TOTAL message count >= 10 AND both users sent >= 1 message (gated by Level 2 consent)
+     * - Prevents spam-based level unlocks (one user sending 5+ messages alone)
      * @param {number} conversationId 
+     * @param {number} senderId - ID of the user sending the message
      * @returns {Promise<{newLevel: number|null, shouldNotify: boolean, threshold: string|null}>}
      */
-    static async incrementMessageCount(conversationId) {
-        // Increment counter
-        await pool.execute(
-            'UPDATE conversations SET message_count = message_count + 1 WHERE id = ?',
+    static async incrementMessageCount(conversationId, senderId) {
+        // Get conversation and match_levels data
+        const [convCheck] = await pool.execute(
+            'SELECT user_id_1, user_id_2, message_count FROM conversations WHERE id = ?',
             [conversationId]
         );
-
-        // Get updated count and conversation details
-        const [rows] = await pool.execute(
-            'SELECT message_count, current_level, user_id_1, user_id_2 FROM conversations WHERE id = ?',
-            [conversationId]
-        );
-
-        if (rows.length === 0) {
-            return { newLevel: null, shouldNotify: false, threshold: null };
+        
+        if (convCheck.length === 0) {
+            return { newLevel: null, shouldNotify: false, threshold: null, messageCount: 0 };
         }
-
-        const { message_count, current_level, user_id_1, user_id_2 } = rows[0];
-
-        // Check if we've reached a threshold
+        
+        const { user_id_1, user_id_2, message_count } = convCheck[0];
+        const [userId1, userId2] = user_id_1 < user_id_2 ? [user_id_1, user_id_2] : [user_id_2, user_id_1];
+        
+        // Ensure match_levels record exists
+        const [matchLevels] = await pool.execute(
+            'SELECT id, user1_message_count, user2_message_count FROM match_levels WHERE conversation_id = ?',
+            [conversationId]
+        );
+        
+        if (matchLevels.length === 0) {
+            await pool.execute(
+                `INSERT INTO match_levels 
+                 (conversation_id, user_id_1, user_id_2, current_level, user1_message_count, user2_message_count) 
+                 VALUES (?, ?, ?, 1, 0, 0)`,
+                [conversationId, userId1, userId2]
+            );
+            console.log(`[MatchLevels] Initialized for conversation ${conversationId}`);
+        }
+        
+        // Get current per-user counts
+        const [mlData] = await pool.execute(
+            `SELECT 
+                current_level,
+                user1_message_count,
+                user2_message_count,
+                level2_user1_consent_state,
+                level2_user2_consent_state,
+                user_id_1
+             FROM match_levels
+             WHERE conversation_id = ?`,
+            [conversationId]
+        );
+        
+        if (mlData.length === 0) {
+            return { newLevel: null, shouldNotify: false, threshold: null, messageCount: message_count + 1 };
+        }
+        
+        const ml = mlData[0];
+        const currentLevel = ml.current_level;
+        const level2BothAccepted = ml.level2_user1_consent_state === 'ACCEPTED' && 
+                                    ml.level2_user2_consent_state === 'ACCEPTED';
+        
+        // Determine which user is sending (user1 or user2 in match_levels)
+        const senderIsUser1 = ml.user_id_1 === senderId;
+        const user1Count = ml.user1_message_count + (senderIsUser1 ? 1 : 0);
+        const user2Count = ml.user2_message_count + (senderIsUser1 ? 0 : 1);
+        
+        // ✅ CRITICAL: Check if BOTH users have participated
+        const bothUsersParticipated = user1Count >= 1 && user2Count >= 1;
+        
+        console.log(`[MessageCount] Conv ${conversationId}: Sender=${senderId} (isUser1=${senderIsUser1})`);
+        console.log(`[MessageCount] Per-user counts: User1=${user1Count}, User2=${user2Count}, BothParticipated=${bothUsersParticipated}`);
+        
+        // ✅ INCREMENT: Update both total count and per-user count
+        const newMessageCount = message_count + 1;
+        await pool.execute(
+            'UPDATE conversations SET message_count = ? WHERE id = ?',
+            [newMessageCount, conversationId]
+        );
+        
+        // Update per-user message count
+        const userCountField = senderIsUser1 ? 'user1_message_count' : 'user2_message_count';
+        const newUserCount = senderIsUser1 ? user1Count : user2Count;
+        await pool.execute(
+            `UPDATE match_levels SET ${userCountField} = ? WHERE conversation_id = ?`,
+            [newUserCount, conversationId]
+        );
+        
         let shouldNotify = false;
         let threshold = null;
-
-        if (message_count === this.THRESHOLDS.LEVEL_2) {
+        
+        console.log(`[MessageCount] Total: ${message_count} → ${newMessageCount}`);
+        
+        // ✅ Level 2 triggers at TOTAL >= 5 AND BOTH users participated
+        if (currentLevel === 1 && newMessageCount >= this.THRESHOLDS.LEVEL_2 && bothUsersParticipated) {
             shouldNotify = true;
             threshold = 'LEVEL_2';
-            // ✅ Set popup_pending flags for both users when Level 2 threshold reached
             await this.setPopupPending(conversationId, user_id_1, user_id_2, 2);
-        } else if (message_count === this.THRESHOLDS.LEVEL_3) {
-            shouldNotify = true;
-            threshold = 'LEVEL_3';
-            // ✅ Set popup_pending flags for both users when Level 3 threshold reached
-            await this.setPopupPending(conversationId, user_id_1, user_id_2, 3);
+            console.log(`[Level2] ✅ Threshold reached: total=${newMessageCount}, user1=${user1Count}, user2=${user2Count}`);
+        } else if (currentLevel === 1 && newMessageCount >= this.THRESHOLDS.LEVEL_2 && !bothUsersParticipated) {
+            console.log(`[Level2] ⚠️  BLOCKED: total=${newMessageCount} BUT only one user talking (user1=${user1Count}, user2=${user2Count})`);
         }
-
+        
+        // ✅ Level 3 triggers at TOTAL >= 10 AND BOTH users participated (ONLY if Level 2 consent accepted)
+        if (currentLevel >= 2 && newMessageCount >= this.THRESHOLDS.LEVEL_3 && bothUsersParticipated) {
+            if (level2BothAccepted) {
+                shouldNotify = true;
+                threshold = 'LEVEL_3';
+                await this.setPopupPending(conversationId, user_id_1, user_id_2, 3);
+                console.log(`[Level3] ✅ Threshold reached: total=${newMessageCount}, user1=${user1Count}, user2=${user2Count}`);
+            } else {
+                console.log(`[Level3] ⚠️  BLOCKED: Threshold reached but Level 2 consent not accepted by both`);
+            }
+        } else if (currentLevel >= 2 && newMessageCount >= this.THRESHOLDS.LEVEL_3 && !bothUsersParticipated) {
+            console.log(`[Level3] ⚠️  BLOCKED: total=${newMessageCount} BUT only one user talking (user1=${user1Count}, user2=${user2Count})`);
+        }
+        
         return {
-            newLevel: current_level,
+            newLevel: currentLevel,
             shouldNotify,
             threshold,
-            messageCount: message_count
+            messageCount: newMessageCount,
+            user1MessageCount: user1Count,
+            user2MessageCount: user2Count,
+            bothUsersParticipated
         };
     }
 
@@ -293,6 +384,7 @@ class ProfileLevelService {
 
     /**
      * Set Level 2 visibility consent for a user (NEW)
+     * ✅ FIXED: "NO" now sets DECLINED_TEMPORARY, popup stays pending for reminder banner
      * @param {number} conversationId 
      * @param {number} userId 
      * @param {boolean} consent 
@@ -313,7 +405,7 @@ class ProfileLevelService {
             [consent, conversationId]
         );
 
-        // ✅ CRITICAL: Clear popup_pending flag in match_levels when user makes decision
+        // ✅ CRITICAL FIX: Update consent state and only clear popup on YES
         const [matchLevels] = await pool.execute(
             'SELECT user_id_1 FROM match_levels WHERE conversation_id = ?',
             [conversationId]
@@ -322,13 +414,24 @@ class ProfileLevelService {
         if (matchLevels.length > 0) {
             const isUser1InML = matchLevels[0].user_id_1 === userId;
             const popupField = isUser1InML ? 'level2_popup_pending_user1' : 'level2_popup_pending_user2';
+            const consentStateField = isUser1InML ? 'level2_user1_consent_state' : 'level2_user2_consent_state';
+            const shareField = isUser1InML ? 'level2_shared_by_user1' : 'level2_shared_by_user2';
+            
+            // ✅ YES = ACCEPTED + clear popup, NO = DECLINED_TEMPORARY + keep popup pending
+            const consentState = consent ? 'ACCEPTED' : 'DECLINED_TEMPORARY';
+            const clearPopup = consent === true;
             
             await pool.execute(
-                `UPDATE match_levels SET ${popupField} = FALSE WHERE conversation_id = ?`,
-                [conversationId]
+                `UPDATE match_levels 
+                 SET ${consentStateField} = ?, 
+                     ${shareField} = ?, 
+                     ${popupField} = ? 
+                 WHERE conversation_id = ?`,
+                [consentState, consent, !clearPopup, conversationId]
             );
             
-            console.log(`[Level2Consent] Cleared ${popupField} for conversation ${conversationId}`);
+            console.log(`[Level2Consent] User ${userId} ${consent ? 'ACCEPTED' : 'DECLINED_TEMPORARY'} for conversation ${conversationId}`);
+            console.log(`[Level2Consent] ${popupField} = ${!clearPopup} (${clearPopup ? 'cleared' : 'kept for reminder banner'})`);
         }
 
         // Check if both users have consented
@@ -338,6 +441,34 @@ class ProfileLevelService {
         );
 
         const bothConsented = updated[0].level2_user1_consent && updated[0].level2_user2_consent;
+
+        // ✅ CRITICAL: When BOTH users accept Level 2, check if Level 3 threshold already met
+        if (bothConsented && consent) {
+            // Update current_level to 2
+            await pool.execute(
+                `UPDATE match_levels SET current_level = 2 WHERE conversation_id = ?`,
+                [conversationId]
+            );
+            
+            // Check if Level 3 threshold already crossed while waiting for consent
+            const [msgCheck] = await pool.execute(
+                'SELECT message_count FROM conversations WHERE id = ?',
+                [conversationId]
+            );
+            
+            const totalMessages = msgCheck[0]?.message_count || 0;
+            console.log(`[Level2Consent] ✅ BOTH users accepted! Total messages: ${totalMessages}`);
+            
+            // Edge case: If already >= 10 messages, trigger Level 3 immediately
+            if (totalMessages >= this.THRESHOLDS.LEVEL_3) {
+                const [conv] = await pool.execute(
+                    'SELECT user_id_1, user_id_2 FROM conversations WHERE id = ?',
+                    [conversationId]
+                );
+                await this.setPopupPending(conversationId, conv[0].user_id_1, conv[0].user_id_2, 3);
+                console.log(`[Level2Consent] ⚡ Level 3 threshold already met! Triggering immediately.`);
+            }
+        }
 
         if (bothConsented) {
             await pool.execute(
@@ -351,6 +482,7 @@ class ProfileLevelService {
 
     /**
      * Set Level 3 visibility consent for a user
+     * ✅ FIXED: "NO" now sets DECLINED_TEMPORARY, popup stays pending for reminder banner
      * @param {number} conversationId 
      * @param {number} userId 
      * @param {boolean} consent 
@@ -371,7 +503,7 @@ class ProfileLevelService {
             [consent, conversationId]
         );
 
-        // ✅ CRITICAL: Clear popup_pending flag in match_levels when user makes decision
+        // ✅ CRITICAL FIX: Update consent state and only clear popup on YES
         const [matchLevels] = await pool.execute(
             'SELECT user_id_1 FROM match_levels WHERE conversation_id = ?',
             [conversationId]
@@ -380,13 +512,24 @@ class ProfileLevelService {
         if (matchLevels.length > 0) {
             const isUser1InML = matchLevels[0].user_id_1 === userId;
             const popupField = isUser1InML ? 'level3_popup_pending_user1' : 'level3_popup_pending_user2';
+            const consentStateField = isUser1InML ? 'level3_user1_consent_state' : 'level3_user2_consent_state';
+            const shareField = isUser1InML ? 'level3_shared_by_user1' : 'level3_shared_by_user2';
+            
+            // ✅ YES = ACCEPTED + clear popup, NO = DECLINED_TEMPORARY + keep popup pending
+            const consentState = consent ? 'ACCEPTED' : 'DECLINED_TEMPORARY';
+            const clearPopup = consent === true;
             
             await pool.execute(
-                `UPDATE match_levels SET ${popupField} = FALSE WHERE conversation_id = ?`,
-                [conversationId]
+                `UPDATE match_levels 
+                 SET ${consentStateField} = ?, 
+                     ${shareField} = ?, 
+                     ${popupField} = ? 
+                 WHERE conversation_id = ?`,
+                [consentState, consent, !clearPopup, conversationId]
             );
             
-            console.log(`[Level3Consent] Cleared ${popupField} for conversation ${conversationId}`);
+            console.log(`[Level3Consent] User ${userId} ${consent ? 'ACCEPTED' : 'DECLINED_TEMPORARY'} for conversation ${conversationId}`);
+            console.log(`[Level3Consent] ${popupField} = ${!clearPopup} (${clearPopup ? 'cleared' : 'kept for reminder banner'})`);
         }
 
         // Check if both users have consented
@@ -524,7 +667,11 @@ class ProfileLevelService {
                 ml.level2_popup_pending_user1,
                 ml.level2_popup_pending_user2,
                 ml.level3_popup_pending_user1,
-                ml.level3_popup_pending_user2
+                ml.level3_popup_pending_user2,
+                ml.level2_user1_consent_state,
+                ml.level2_user2_consent_state,
+                ml.level3_user1_consent_state,
+                ml.level3_user2_consent_state
             FROM conversations c
             JOIN users u_self ON u_self.id = ?
             JOIN users u_partner ON u_partner.id = CASE WHEN c.user_id_1 = ? THEN c.user_id_2 ELSE c.user_id_1 END
@@ -559,6 +706,14 @@ class ProfileLevelService {
         const level3PopupPending = data.ml_user_id_1
             ? Boolean(isUser1InMatchLevels ? data.level3_popup_pending_user1 : data.level3_popup_pending_user2)
             : false;
+
+        // ✅ NEW: Get consent state for reminder banner logic
+        const level2ConsentState = data.ml_user_id_1
+            ? (isUser1InMatchLevels ? data.level2_user1_consent_state : data.level2_user2_consent_state)
+            : 'PENDING';
+        const level3ConsentState = data.ml_user_id_1
+            ? (isUser1InMatchLevels ? data.level3_user1_consent_state : data.level3_user2_consent_state)
+            : 'PENDING';
 
         // ✅ CRITICAL: Determine explicit actions for each level
         // Level 2 Action Logic
@@ -596,6 +751,7 @@ class ProfileLevelService {
             level2PartnerConsent: partnerLevel2Consent,
             level2Visible: msgCount >= this.THRESHOLDS.LEVEL_2 && userLevel2Consent && partnerLevel2Consent,
             level2PopupPending: level2PopupPending, // ✅ CRITICAL: Backend drives popup visibility
+            level2ConsentState: level2ConsentState, // ✅ NEW: For reminder banner (PENDING | ACCEPTED | DECLINED_TEMPORARY)
             
             // Level 3 status
             level3ThresholdReached: msgCount >= this.THRESHOLDS.LEVEL_3,
@@ -606,6 +762,7 @@ class ProfileLevelService {
             level3PartnerConsent: partnerLevel3Consent,
             level3Visible: msgCount >= this.THRESHOLDS.LEVEL_3 && userLevel3Consent && partnerLevel3Consent,
             level3PopupPending: level3PopupPending, // ✅ CRITICAL: Backend drives popup visibility
+            level3ConsentState: level3ConsentState, // ✅ NEW: For reminder banner (PENDING | ACCEPTED | DECLINED_TEMPORARY)
             
             partnerName: data.partner_name
         };

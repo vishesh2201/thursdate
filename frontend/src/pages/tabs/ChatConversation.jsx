@@ -4,6 +4,7 @@ import { chatAPI } from '../../utils/api';
 import socketService from '../../utils/socket';
 import LevelUpPopup from './LevelUpPopup';
 import Level2UnlockedPopup from './Level2UnlockedPopup';
+import ConsentReminderBanner from '../../components/ConsentReminderBanner';
 
 export default function ChatConversation() {
     const navigate = useNavigate();
@@ -24,6 +25,9 @@ export default function ChatConversation() {
     const [isPlaying, setIsPlaying] = useState(false);
     const [showUnmatchDialog, setShowUnmatchDialog] = useState(false);
     const [showBlockDialog, setShowBlockDialog] = useState(false);
+    const [showReportDialog, setShowReportDialog] = useState(false);
+    const [reportReason, setReportReason] = useState('');
+    const [reportDescription, setReportDescription] = useState('');
     const menuRef = useRef(null);
     const messagesEndRef = useRef(null);
     const typingTimeoutRef = useRef(null);
@@ -247,10 +251,6 @@ export default function ChatConversation() {
     const loadLevelStatus = async () => {
         try {
             const status = await chatAPI.getLevelStatus(conversationId);
-            console.log('[Level] Loaded status:', status);
-            console.log('[Level] level2PopupPending =', status?.level2PopupPending);
-            console.log('[Level] level2Action =', status?.level2Action);
-            console.log('[Level] level3PopupPending =', status?.level3PopupPending);
             setLevelStatus(status);
             console.log('[Level] Status loaded:', status);
             console.log('[Level] Popup pending - Level 2:', status?.level2PopupPending, 'Level 3:', status?.level3PopupPending);
@@ -275,14 +275,14 @@ export default function ChatConversation() {
                     levelOnly: 2,
                     returnTo: '/chat-conversation',
                     returnState: { 
-                        conversationId, 
-                        otherUser
+                        conversationId,
+                        otherUser,
+                        selectedTab: 'chats'
                     }
                 } 
             });
         } else {
             console.error('[Level2] Invalid action for Fill Info button:', action);
-            alert('Unable to open profile questions. Please try refreshing the page.');
         }
     };
 
@@ -311,9 +311,28 @@ export default function ChatConversation() {
 
     // ✅ Handle Level 3 popup - redirect to questions OR show consent
     const handleLevel3FillInfo = () => {
-        // Level 3 questions don't exist yet (face photos feature missing)
-        // For now, just auto-consent
-        handleLevel3Yes();
+        const action = levelStatus?.level3Action;
+        console.log('[Level3] Fill Info clicked, action:', action);
+        
+        // ✅ CRITICAL: Frontend ONLY redirects if backend says FILL_INFORMATION
+        if (action === 'FILL_INFORMATION') {
+            console.log('[Level3] Action is FILL_INFORMATION - navigating to profile-questions');
+            navigate('/profile-questions', { 
+                state: { 
+                    levelOnly: 3,
+                    returnTo: '/chat-conversation',
+                    returnState: { 
+                        conversationId,
+                        otherUser,
+                        selectedTab: 'chats'
+                    }
+                } 
+            });
+        } else {
+            // If no Level 3 questions needed, just auto-consent
+            console.log('[Level3] No Level 3 questions, auto-consenting');
+            handleLevel3Yes();
+        }
     };
 
     // ✅ Handle Level 3 consent - YES
@@ -671,6 +690,41 @@ export default function ChatConversation() {
         }
     };
 
+    const handleReport = async () => {
+        try {
+            if (!reportReason) {
+                alert('Please select a reason for reporting');
+                return;
+            }
+
+            // Call API to submit report
+            await chatAPI.reportUser(
+                otherUser.id,
+                conversationId,
+                reportReason,
+                reportDescription.trim()
+            );
+
+            console.log('Report submitted successfully');
+            
+            // Close dialog and reset form
+            setShowReportDialog(false);
+            setReportReason('');
+            setReportDescription('');
+            
+            // Show confirmation
+            alert('Thanks for reporting. Our team will review this.');
+            
+        } catch (error) {
+            console.error('Failed to submit report:', error);
+            if (error.message.includes('already reported')) {
+                alert('You have already reported this user recently. Please wait 24 hours before reporting again.');
+            } else {
+                alert('Failed to submit report. Please try again.');
+            }
+        }
+    };
+
     const formatTime = (timestamp) => {
         if (!timestamp) return '';
 
@@ -784,10 +838,9 @@ export default function ChatConversation() {
                                 <button
                                     onClick={() => {
                                         setShowMenu(false);
-                                        // Report is not implemented yet - show coming soon or do nothing
+                                        setShowReportDialog(true);
                                     }}
-                                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-black/5 transition-colors text-left opacity-50 cursor-not-allowed"
-                                    disabled
+                                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-black/5 transition-colors text-left"
                                 >
                                     <span className="text-gray-800 font-medium">Report</span>
                                     <svg className="w-5 h-5 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -830,6 +883,27 @@ export default function ChatConversation() {
                     </div>
                 </div>
             </div>
+
+            {/* ✅ Consent Reminder Banners - Show when consent is PENDING but user clicked "NO" */}
+            <ConsentReminderBanner
+                show={
+                    levelStatus?.level2PopupPending === true && 
+                    levelStatus?.level2ConsentState === 'DECLINED_TEMPORARY'
+                }
+                level={2}
+                partnerName={otherUser?.firstName || otherUser?.name || 'Your match'}
+                onShareNow={handleLevel2Yes}
+            />
+            
+            <ConsentReminderBanner
+                show={
+                    levelStatus?.level3PopupPending === true && 
+                    levelStatus?.level3ConsentState === 'DECLINED_TEMPORARY'
+                }
+                level={3}
+                partnerName={otherUser?.firstName || otherUser?.name || 'Your match'}
+                onShareNow={handleLevel3Yes}
+            />
 
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4 scrollbar-hide">
@@ -927,10 +1001,12 @@ export default function ChatConversation() {
 
             {/* Input Area */}
             <div className="bg-gradient-to-t from-black/60 to-transparent px-4 py-4 pb-8 z-10 relative">
-                {/* ✅ Level Up Popups - Driven by backend popupPending flags */}
-                {console.log('[Popup Debug] Rendering - level2PopupPending:', levelStatus?.level2PopupPending, 'show value:', levelStatus?.level2PopupPending === true)}
+                {/* ✅ Level Up Popups - Only show if NOT declined temporarily */}
                 <LevelUpPopup
-                    show={levelStatus?.level2PopupPending === true}
+                    show={
+                        levelStatus?.level2PopupPending === true && 
+                        levelStatus?.level2ConsentState !== 'DECLINED_TEMPORARY'
+                    }
                     type="LEVEL_2"
                     action={levelStatus?.level2Action}
                     partnerName={otherUser?.firstName || otherUser?.name || 'Your match'}
@@ -940,7 +1016,10 @@ export default function ChatConversation() {
                 />
                 
                 <LevelUpPopup
-                    show={levelStatus?.level3PopupPending === true}
+                    show={
+                        levelStatus?.level3PopupPending === true && 
+                        levelStatus?.level3ConsentState !== 'DECLINED_TEMPORARY'
+                    }
                     type="LEVEL_3"
                     action={levelStatus?.level3Action}
                     partnerName={otherUser?.firstName || otherUser?.name || 'Your match'}
@@ -1202,6 +1281,95 @@ export default function ChatConversation() {
                                 </button>
                                 <button
                                     onClick={() => setShowBlockDialog(false)}
+                                    className="w-full py-3 px-4 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Report Dialog */}
+            {showReportDialog && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[45] px-4">
+                    <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden max-h-[90vh] flex flex-col">
+                        <div className="p-6 overflow-y-auto">
+                            <h3 className="text-xl font-semibold text-gray-800 mb-2">Report {otherUser?.firstName || otherUser?.name}</h3>
+                            <p className="text-gray-600 text-sm mb-6">
+                                Help us understand what's wrong. Your report is anonymous and will be reviewed by our team.
+                            </p>
+
+                            {/* Reason Selection */}
+                            <div className="space-y-2 mb-4">
+                                <label className="text-sm font-medium text-gray-700">Reason *</label>
+                                <div className="space-y-2">
+                                    {[
+                                        { value: 'inappropriate_messages', label: 'Inappropriate messages' },
+                                        { value: 'fake_profile', label: 'Fake profile' },
+                                        { value: 'harassment', label: 'Harassment' },
+                                        { value: 'spam', label: 'Spam' },
+                                        { value: 'other', label: 'Other' }
+                                    ].map((option) => (
+                                        <label 
+                                            key={option.value}
+                                            className="flex items-center gap-3 p-3 border border-gray-200 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors"
+                                        >
+                                            <input
+                                                type="radio"
+                                                name="reportReason"
+                                                value={option.value}
+                                                checked={reportReason === option.value}
+                                                onChange={(e) => setReportReason(e.target.value)}
+                                                className="w-4 h-4 text-blue-600"
+                                            />
+                                            <span className="text-gray-800 text-sm">{option.label}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Description (Optional) */}
+                            <div className="space-y-2 mb-6">
+                                <label className="text-sm font-medium text-gray-700">
+                                    Additional details (optional)
+                                </label>
+                                <textarea
+                                    value={reportDescription}
+                                    onChange={(e) => {
+                                        if (e.target.value.length <= 500) {
+                                            setReportDescription(e.target.value);
+                                        }
+                                    }}
+                                    placeholder="Provide any additional context..."
+                                    className="w-full p-3 border border-gray-200 rounded-xl resize-none focus:outline-none focus:border-blue-500 transition-colors"
+                                    rows={4}
+                                    maxLength={500}
+                                />
+                                <p className="text-xs text-gray-500 text-right">
+                                    {reportDescription.length}/500
+                                </p>
+                            </div>
+
+                            <div className="space-y-3">
+                                <button
+                                    onClick={handleReport}
+                                    disabled={!reportReason}
+                                    className={`w-full py-3 px-4 rounded-xl font-medium transition-colors ${
+                                        reportReason 
+                                            ? 'bg-red-500 text-white hover:bg-red-600' 
+                                            : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                    }`}
+                                >
+                                    Submit Report
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowReportDialog(false);
+                                        setReportReason('');
+                                        setReportDescription('');
+                                    }}
                                     className="w-full py-3 px-4 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200 transition-colors"
                                 >
                                     Cancel

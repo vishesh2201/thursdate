@@ -80,7 +80,7 @@ export default function LevelUpPopup({ show, type, action, partnerName, onFillIn
                                             onClick={onNo}
                                             className="flex-1 bg-white/20 text-white font-semibold py-2.5 px-4 rounded-xl hover:bg-white/30 transition-colors border border-white/30"
                                         >
-                                            No
+                                            Not now
                                         </button>
                                     )}
                                 </div>

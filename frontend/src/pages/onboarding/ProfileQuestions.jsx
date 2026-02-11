@@ -210,17 +210,35 @@ export default function ProfileQuestions() {
                     await chatAPI.completeLevel2(returnState.conversationId);
                     console.log('[Level 2] Marked as complete for conversation', returnState.conversationId);
                     // Navigate back to the specific chat conversation
-                    console.log('[Level 2] Navigating to:', returnTo, 'with state:', returnState);
-                    navigate(returnTo || '/home', { state: returnState });
+                    console.log('[Level 2] Navigating to chat-conversation with state:', returnState);
+                    navigate('/chat-conversation', { state: returnState });
                 } catch (err) {
                     console.error('[Level 2] Failed to mark complete:', err);
                     alert('Your answers were saved, but there was an error updating your conversation. Please try reopening the chat.');
                     // Still navigate back - user data is saved, just the conversation flag might not be set
-                    navigate(returnTo || '/home', { state: returnState });
+                    navigate('/chat-conversation', { state: returnState });
                 }
+            } else if (levelOnly === 3 && returnState?.conversationId) {
+                try {
+                    await chatAPI.completeLevel3(returnState.conversationId);
+                    console.log('[Level 3] Marked as complete for conversation', returnState.conversationId);
+                    // Navigate back to the specific chat conversation
+                    console.log('[Level 3] Navigating to chat-conversation with state:', returnState);
+                    navigate('/chat-conversation', { state: returnState });
+                } catch (err) {
+                    console.error('[Level 3] Failed to mark complete:', err);
+                    alert('Your answers were saved, but there was an error updating your conversation. Please try reopening the chat.');
+                    // Still navigate back - user data is saved, just the conversation flag might not be set
+                    navigate('/chat-conversation', { state: returnState });
+                }
+            } else if (returnTo === '/chat-conversation' && returnState?.conversationId) {
+                // ✅ FIX: If there's a conversationId in returnState, go to chat-conversation
+                console.log('[ProfileQuestions] Navigating to chat-conversation with state:', returnState);
+                navigate('/chat-conversation', { state: returnState });
             } else {
-                console.log('[ProfileQuestions] Not a Level 2 flow, going to profile-photos');
-                navigate('/profile-photos');
+                // No specific return destination, go to home
+                console.log('[ProfileQuestions] No return destination, going to home');
+                navigate('/home');
             }
         } catch (err) {
             console.error('Save failed', err);

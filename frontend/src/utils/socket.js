@@ -117,6 +117,10 @@ class SocketService {
    */
   onNewMessage(callback) {
     if (this.socket) {
+      // Remove old listener if exists to prevent duplicates
+      if (this.listeners.has('new_message')) {
+        this.socket.off('new_message', this.listeners.get('new_message'));
+      }
       this.socket.on('new_message', callback);
       this.listeners.set('new_message', callback);
     }
@@ -128,6 +132,10 @@ class SocketService {
    */
   onUserTyping(callback) {
     if (this.socket) {
+      // Remove old listener if exists to prevent duplicates
+      if (this.listeners.has('user_typing')) {
+        this.socket.off('user_typing', this.listeners.get('user_typing'));
+      }
       this.socket.on('user_typing', callback);
       this.listeners.set('user_typing', callback);
     }
@@ -139,6 +147,10 @@ class SocketService {
    */
   onMessagesRead(callback) {
     if (this.socket) {
+      // Remove old listener if exists to prevent duplicates
+      if (this.listeners.has('messages_read')) {
+        this.socket.off('messages_read', this.listeners.get('messages_read'));
+      }
       this.socket.on('messages_read', callback);
       this.listeners.set('messages_read', callback);
     }
@@ -160,6 +172,10 @@ class SocketService {
    */
   onUserStatus(callback) {
     if (this.socket) {
+      // Remove old listener if exists to prevent duplicates
+      if (this.listeners.has('user_status')) {
+        this.socket.off('user_status', this.listeners.get('user_status'));
+      }
       this.socket.on('user_status', callback);
       this.listeners.set('user_status', callback);
     }
@@ -171,6 +187,10 @@ class SocketService {
    */
   onMatchMovedToChat(callback) {
     if (this.socket) {
+      // Remove old listener if exists to prevent duplicates
+      if (this.listeners.has('match_moved_to_chat')) {
+        this.socket.off('match_moved_to_chat', this.listeners.get('match_moved_to_chat'));
+      }
       this.socket.on('match_moved_to_chat', callback);
       this.listeners.set('match_moved_to_chat', callback);
     }
@@ -194,6 +214,10 @@ class SocketService {
    */
   on(event, callback) {
     if (this.socket) {
+      // Remove old listener if exists to prevent duplicates
+      if (this.listeners.has(event)) {
+        this.socket.off(event, this.listeners.get(event));
+      }
       this.socket.on(event, callback);
       this.listeners.set(event, callback);
     }
