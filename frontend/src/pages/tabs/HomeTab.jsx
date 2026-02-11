@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { userAPI, chatAPI } from "../../utils/api";
+import DailyGamePopup from "../../components/DailyGamePopup";
 
 const navOptions = [
   { key: "matches", label: "Matches", icon: "/matches-icon.svg" },
@@ -33,6 +34,49 @@ export default function HomeTab() {
   // Match notification state
   const [showMatchNotification, setShowMatchNotification] = useState(false);
   const [matchedUser, setMatchedUser] = useState(null);
+
+  // Daily game popup state
+  const [showDailyGame, setShowDailyGame] = useState(false);
+
+  // Check if user should see daily game (once per day)
+  useEffect(() => {
+    const checkDailyGame = async () => {
+      try {
+        // Check if user has seen game today
+        const lastGameDate = localStorage.getItem('lastGameDate');
+        const today = new Date().toDateString();
+
+        if (lastGameDate !== today) {
+          // Check if there's a game available for today
+          const token = localStorage.getItem('token');
+          const API_URL = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:5000/api';
+
+          const response = await fetch(`${API_URL}/daily-game/today`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+
+          const data = await response.json();
+
+          // Show popup if there's a game and user hasn't played it
+          if (data.hasGame && !data.hasPlayed) {
+            // Delay popup by 1 second for better UX
+            setTimeout(() => {
+              setShowDailyGame(true);
+            }, 1000);
+          }
+
+          // Update last seen date regardless
+          localStorage.setItem('lastGameDate', today);
+        }
+      } catch (error) {
+        console.error('Error checking daily game:', error);
+      }
+    };
+
+    checkDailyGame();
+  }, []);
 
   // Fetch potential matches on component mount
   useEffect(() => {
@@ -648,6 +692,11 @@ export default function HomeTab() {
           );
         })}
       </nav>
+
+      {/* Daily Game Popup */}
+      {showDailyGame && (
+        <DailyGamePopup onClose={() => setShowDailyGame(false)} />
+      )}
     </div>
   );
 } 
