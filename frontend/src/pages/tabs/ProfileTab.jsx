@@ -385,7 +385,7 @@ export default function ProfileTab() {
   };
 
   return (
-    <div className="h-screen w-full relative font-sans overflow-hidden fixed inset-0">
+    <div className="h-screen w-full font-sans overflow-hidden fixed inset-0">
       {/* Blurred Background */}
       <div
         className="absolute inset-0"

@@ -11,8 +11,7 @@ export default function LevelUpPopup({
     otherUserName,
     conversationId,
     onConsent,
-    onDecline,
-    onClose
+    onDecline
 }) {
     const navigate = useNavigate();
     

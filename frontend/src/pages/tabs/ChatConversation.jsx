@@ -208,7 +208,12 @@ export default function ChatConversation() {
                 loadLevelStatus();
             }
         });
-// Clear status poll interval
+
+        // ✅ Load initial level status
+        loadLevelStatus();
+
+        return () => {
+            // Clear status poll interval
             clearInterval(statusPollInterval);
             
             socketService.leaveConversation(conversationId);
@@ -219,12 +224,7 @@ export default function ChatConversation() {
             socketService.off('user_status');
             socketService.off('message_deleted');
             socketService.off('conversation_unmatched');
-            socketService.off('connect
-            socketService.off('messages_read');
-            socketService.off('message_delivered');
-            socketService.off('user_status');
-            socketService.off('message_deleted');
-            socketService.off('conversation_unmatched');
+            socketService.off('connect');
             socketService.off('level_threshold_reached');
             socketService.off('level2_unlocked');
             socketService.off('level3_unlocked');
@@ -417,8 +417,9 @@ export default function ChatConversation() {
         scrollToBottom();
 
         try {
-            const newMsg = await chatAPI.sendMessage(conversationId, 'text', textToSend);
-            console.log('Message sent, received response:', newMsg);
+            // Use Socket.IO for instant message delivery (faster than REST API)
+            const newMsg = await socketService.sendMessage(conversationId, 'text', textToSend);
+            console.log('✅ Message sent via socket, received response:', newMsg);
 
             // Replace optimistic message with real message
             const normalizedMsg = normalizeMessage(newMsg);
@@ -426,14 +427,30 @@ export default function ChatConversation() {
                 msg.id === tempId ? normalizedMsg : msg
             ));
         } catch (error) {
-            console.error('Failed to send message:', error);
-            // Mark message as failed
-            setMessages(prev => prev.map(msg =>
-                msg.id === tempId ? { ...msg, status: 'FAILED' } : msg
-            ));
+            console.error('❌ Failed to send message via socket:', error);
+            
+            // Fallback to REST API if socket fails
+            try {
+                console.log('🔄 Attempting fallback to REST API...');
+                const newMsg = await chatAPI.sendMessage(conversationId, 'text', textToSend);
+                console.log('✅ Message sent via REST API:', newMsg);
+
+                const normalizedMsg = normalizeMessage(newMsg);
+                setMessages(prev => prev.map(msg =>
+                    msg.id === tempId ? normalizedMsg : msg
+                ));
+            } catch (fallbackError) {
+                console.error('❌ Fallback also failed:', fallbackError);
+                // Mark message as failed
+                setMessages(prev => prev.map(msg =>
+                    msg.id === tempId ? { ...msg, status: 'FAILED' } : msg
+                ));
+            }
         }
     };
- && !e.shiftKey) {
+
+    const handleKeyPress = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             handleSendMessage();
         }
@@ -441,9 +458,7 @@ export default function ChatConversation() {
 
     const onEmojiClick = (emojiData) => {
         setMessage(prev => prev + emojiData.emoji);
-        inputRef.current?.focus();f (e.key === 'Enter') {
-            handleSendMessage();
-        }
+        inputRef.current?.focus();
     };
 
     const handleTyping = (e) => {
@@ -1192,6 +1207,16 @@ export default function ChatConversation() {
                             <button
                                 type="button"
                                 onClick={stopRecording}
+                                className="w-11 h-11 bg-[#00A884] rounded-full flex items-center justify-center flex-shrink-0 hover:bg-[#008c6f] transition-all shadow-lg"
+                            >
+                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                            </button>
+                        </>
+                    ) : (
+                        /* Normal Mode with emoji picker */
+                        <>
                             {/* Emoji Picker - WhatsApp Style */}
                             {showEmojiPicker && (
                                 <div 
@@ -1236,50 +1261,41 @@ export default function ChatConversation() {
                                     onKeyPress={handleKeyPress}
                                     placeholder="Message"
                                     className="flex-1 bg-transparent text-gray-800 placeholder-gray-500 outline-none text-sm"
-                                /
-                                    type="button"
-                                    onClick={() => inputRef.current?.focus()}
-                                    className="ml-2"
-                                >
-                                    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                </button>
+                                />
                             </div>
 
                             {message.trim() ? (
-                              <button
-  type="button"
-  onClick={handleSendMessage}
-  className="w-10 h-10 bg-white rounded-full flex items-center justify-center flex-shrink-0"
->
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="18"
-    height="18"
-    viewBox="0 0 18 18"
-    fill="none"
-  >
-    <path
-      d="M17.5158 2.01275C17.9478 0.81775 16.7898 -0.34025 15.5948 0.0927503L0.989804 5.37475C-0.209196 5.80875 -0.354196 7.44475 0.748804 8.08375L5.4108 10.7828L9.5738 6.61975C9.76241 6.43759 10.015 6.3368 10.2772 6.33908C10.5394 6.34135 10.7902 6.44652 10.9756 6.63193C11.161 6.81734 11.2662 7.06815 11.2685 7.33035C11.2708 7.59255 11.17 7.84515 10.9878 8.03375L6.8248 12.1968L9.5248 16.8587C10.1628 17.9618 11.7988 17.8158 12.2328 16.6178L17.5158 2.01275Z"
-      fill="url(#paint0_linear_3584_5867)"
-    />
-    <defs>
-      <linearGradient
-        id="paint0_linear_3584_5867"
-        x1="8.80409"
-        y1="0"
-        x2="8.80409"
-        y2="17.6072"
-        gradientUnits="userSpaceOnUse"
-      >
-        <stop stopColor="#DD9200" />
-        <stop offset="1" stopColor="#F9C900" />
-      </linearGradient>
-    </defs>
-  </svg>
-</button>
-
+                                <button
+                                    type="button"
+                                    onClick={handleSendMessage}
+                                    className="w-10 h-10 bg-white rounded-full flex items-center justify-center flex-shrink-0"
+                                >
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="18"
+                                        height="18"
+                                        viewBox="0 0 18 18"
+                                        fill="none"
+                                    >
+                                        <path
+                                            d="M17.5158 2.01275C17.9478 0.81775 16.7898 -0.34025 15.5948 0.0927503L0.989804 5.37475C-0.209196 5.80875 -0.354196 7.44475 0.748804 8.08375L5.4108 10.7828L9.5738 6.61975C9.76241 6.43759 10.015 6.3368 10.2772 6.33908C10.5394 6.34135 10.7902 6.44652 10.9756 6.63193C11.161 6.81734 11.2662 7.06815 11.2685 7.33035C11.2708 7.59255 11.17 7.84515 10.9878 8.03375L6.8248 12.1968L9.5248 16.8587C10.1628 17.9618 11.7988 17.8158 12.2328 16.6178L17.5158 2.01275Z"
+                                            fill="url(#paint0_linear_3584_5867)"
+                                        />
+                                        <defs>
+                                            <linearGradient
+                                                id="paint0_linear_3584_5867"
+                                                x1="8.80409"
+                                                y1="0"
+                                                x2="8.80409"
+                                                y2="17.6072"
+                                                gradientUnits="userSpaceOnUse"
+                                            >
+                                                <stop stopColor="#DD9200" />
+                                                <stop offset="1" stopColor="#F9C900" />
+                                            </linearGradient>
+                                        </defs>
+                                    </svg>
+                                </button>
                             ) : (
                                 <button
                                     type="button"

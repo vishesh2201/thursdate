@@ -147,6 +147,61 @@ class SocketService {
   }
 
   /**
+   * Send a message via Socket.IO (faster than REST API)
+   * @param {number} conversationId - ID of the conversation
+   * @param {string} messageType - Type of message ('text' or 'voice')
+   * @param {string} content - Message content
+   * @param {number} voiceDuration - Duration of voice message (optional)
+   * @returns {Promise} - Resolves when message is sent, rejects on error
+   */
+  sendMessage(conversationId, messageType, content, voiceDuration = null) {
+    return new Promise((resolve, reject) => {
+      if (!this.socket || !this.socket.connected) {
+        reject(new Error('Socket not connected'));
+        return;
+      }
+
+      // Set up one-time listeners for response
+      const successHandler = (data) => {
+        if (data.conversationId === conversationId) {
+          cleanup();
+          resolve(data.message);
+        }
+      };
+
+      const errorHandler = (data) => {
+        if (data.conversationId === conversationId) {
+          cleanup();
+          reject(new Error(data.error || 'Failed to send message'));
+        }
+      };
+
+      const cleanup = () => {
+        this.socket.off('message_sent', successHandler);
+        this.socket.off('message_error', errorHandler);
+      };
+
+      // Listen for response
+      this.socket.on('message_sent', successHandler);
+      this.socket.on('message_error', errorHandler);
+
+      // Emit message
+      this.socket.emit('send_message', {
+        conversationId,
+        messageType,
+        content,
+        voiceDuration
+      });
+
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        cleanup();
+        reject(new Error('Message send timeout'));
+      }, 10000);
+    });
+  }
+
+  /**
    * Listen for new messages
    * @param {Function} callback - Callback function to handle new messages
    */
