@@ -49,11 +49,17 @@ export default function ChatConversation() {
     // const [pendingLevel2Threshold, setPendingLevel2Threshold] = useState(false);
     // const [pendingLevel3Threshold, setPendingLevel3Threshold] = useState(false);
 
-    // Normalize message timestamp - ensure createdAt exists
+    // Normalize message - ensure createdAt and isSent are set correctly
     const normalizeMessage = (msg) => {
+        // Get current user ID from token
+        const token = localStorage.getItem('token');
+        const currentUserId = token ? JSON.parse(atob(token.split('.')[1])).userId : null;
+        
         return {
             ...msg,
-            createdAt: msg.createdAt || msg.created_at || new Date().toISOString()
+            createdAt: msg.createdAt || msg.created_at || new Date().toISOString(),
+            // ✅ Always set isSent based on current user - critical for message alignment
+            isSent: msg.senderId === currentUserId
         };
     };
 
