@@ -5,6 +5,7 @@ import socketService from '../../utils/socket';
 import LevelUpPopup from './LevelUpPopup';
 import Level2UnlockedPopup from './Level2UnlockedPopup';
 import ConsentReminderBanner from '../../components/ConsentReminderBanner';
+import EmojiPicker from 'emoji-picker-react';
 
 export default function ChatConversation() {
     const navigate = useNavigate();
@@ -28,8 +29,10 @@ export default function ChatConversation() {
     const [showReportDialog, setShowReportDialog] = useState(false);
     const [reportReason, setReportReason] = useState('');
     const [reportDescription, setReportDescription] = useState('');
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const menuRef = useRef(null);
     const messagesEndRef = useRef(null);
+    const emojiPickerRef = useRef(null);
     const typingTimeoutRef = useRef(null);
     const mediaRecorderRef = useRef(null);
     const audioChunksRef = useRef([]);
@@ -430,9 +433,15 @@ export default function ChatConversation() {
             ));
         }
     };
+ && !e.shiftKey) {
+            e.preventDefault();
+            handleSendMessage();
+        }
+    };
 
-    const handleKeyPress = (e) => {
-        if (e.key === 'Enter') {
+    const onEmojiClick = (emojiData) => {
+        setMessage(prev => prev + emojiData.emoji);
+        inputRef.current?.focus();f (e.key === 'Enter') {
             handleSendMessage();
         }
     };
@@ -768,22 +777,29 @@ export default function ChatConversation() {
 
 
 
-    // Close menu when clicking outside
+    // Close menu and emoji picker when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (menuRef.current && !menuRef.current.contains(event.target)) {
                 setShowMenu(false);
             }
+            if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target)) {
+                // Don't close if clicking the emoji button itself
+                const emojiButton = event.target.closest('button');
+                if (!emojiButton || !emojiButton.querySelector('svg path[d*="M14.828"]')) {
+                    setShowEmojiPicker(false);
+                }
+            }
         };
 
-        if (showMenu) {
+        if (showMenu || showEmojiPicker) {
             document.addEventListener('mousedown', handleClickOutside);
         }
 
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [showMenu]);
+    }, [showMenu, showEmojiPicker]);
 
 
 
@@ -1176,15 +1192,42 @@ export default function ChatConversation() {
                             <button
                                 type="button"
                                 onClick={stopRecording}
-                                className="w-11 h-11 bg-[#00A884] rounded-full flex items-center justify-center flex-shrink-0 hover:bg-[#008c6f] transition-all shadow-lg"
-                            >
-                                <div className="w-4 h-4 bg-white rounded-sm"></div>
-                            </button>
-                        </>
-                    ) : (
-                        /* Normal Mode - Text Input */
-                        <>
-                            <div className="flex-1 bg-white rounded-full px-4 py-3 flex items-center">
+                            {/* Emoji Picker - WhatsApp Style */}
+                            {showEmojiPicker && (
+                                <div 
+                                    ref={emojiPickerRef}
+                                    className="absolute bottom-20 left-4 z-50 shadow-2xl rounded-2xl overflow-hidden"
+                                    style={{ 
+                                        maxWidth: 'calc(100vw - 2rem)',
+                                        width: '350px'
+                                    }}
+                                >
+                                    <EmojiPicker
+                                        onEmojiClick={onEmojiClick}
+                                        width="100%"
+                                        height="400px"
+                                        theme="light"
+                                        searchPlaceHolder="Search emoji..."
+                                        previewConfig={{ showPreview: false }}
+                                        skinTonesDisabled
+                                        emojiStyle="native"
+                                    />
+                                </div>
+                            )}
+
+                            <div className="flex-1 bg-white rounded-full px-4 py-3 flex items-center gap-2">
+                                {/* Emoji Button */}
+                                <button
+                                    type="button"
+                                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                                    className="flex-shrink-0 hover:scale-110 transition-transform"
+                                >
+                                    <svg className="w-6 h-6 text-gray-500 hover:text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </button>
+
+                                {/* Text Input */}
                                 <input
                                     ref={inputRef}
                                     type="text"
@@ -1193,8 +1236,7 @@ export default function ChatConversation() {
                                     onKeyPress={handleKeyPress}
                                     placeholder="Message"
                                     className="flex-1 bg-transparent text-gray-800 placeholder-gray-500 outline-none text-sm"
-                                />
-                                <button
+                                /
                                     type="button"
                                     onClick={() => inputRef.current?.focus()}
                                     className="ml-2"
