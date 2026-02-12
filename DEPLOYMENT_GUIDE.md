@@ -55,8 +55,8 @@ CLOUDINARY_API_KEY=<from-cloudinary-console>
 CLOUDINARY_API_SECRET=<from-cloudinary-console>
 ADMIN_EMAILS=admin@example.com
 FRONTEND_URL=https://thursdate.vercel.app
-EMAIL_USER=<your-gmail-address>
-EMAIL_PASSWORD=<gmail-app-password>
+SENDGRID_API_KEY=<your-sendgrid-api-key>
+SENDGRID_FROM_EMAIL=noreply@thursdate.app
 ```
 
 **Generate JWT Secret:**
@@ -64,13 +64,25 @@ EMAIL_PASSWORD=<gmail-app-password>
 node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 ```
 
-**How to get Gmail App Password:**
-1. Go to https://myaccount.google.com/security
-2. Enable 2-Step Verification if not already enabled
-3. Go to https://myaccount.google.com/apppasswords
-4. Create app password for "Mail"
-5. Copy the 16-character password (no spaces)
-6. Use this as EMAIL_PASSWORD
+**How to get SendGrid API Key:**
+1. Go to https://sendgrid.com/ and create a free account (100 emails/day)
+2. Verify your email address
+3. Go to Settings → API Keys
+4. Click "Create API Key"
+5. Name it "Thursdate Production"
+6. Select "Full Access" or "Restricted Access" with Mail Send permissions
+7. Copy the API key (starts with "SG.")
+8. Use this as SENDGRID_API_KEY
+
+**How to verify sender email:**
+1. In SendGrid dashboard, go to Settings → Sender Authentication
+2. Click "Verify a Single Sender"
+3. Fill in your details with the email you want to use (e.g., noreply@yourdomain.com)
+4. SendGrid will send a verification email
+5. Click the link to verify
+6. Use this email as SENDGRID_FROM_EMAIL
+
+**Note:** SendGrid free tier allows 100 emails/day. For higher volume, upgrade to a paid plan.
 
 **Optional Variables (if using AWS Rekognition for face verification):**
 ```bash

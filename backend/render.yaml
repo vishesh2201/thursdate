@@ -36,10 +36,10 @@ services:
         sync: false
       - key: ADMIN_EMAILS
         sync: false
-      - key: EMAIL_USER
-        sync: false # Gmail address for sending OTP emails
-      - key: EMAIL_PASSWORD
-        sync: false # Gmail App Password (not regular password)
+      - key: SENDGRID_API_KEY
+        sync: false # SendGrid API Key from sendgrid.com
+      - key: SENDGRID_FROM_EMAIL
+        value: noreply@thursdate.app # Verified sender email in SendGrid
 
 # Note: 
 # - Set 'sync: false' variables manually in Render Dashboard

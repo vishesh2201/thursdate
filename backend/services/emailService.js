@@ -1,35 +1,54 @@
-const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail');
 
 class EmailService {
   constructor() {
-    this.transporter = null;
+    this.initialized = false;
     this.initialize();
   }
 
   initialize() {
     try {
-      this.transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASSWORD // This should be an App Password from Gmail
-        }
-      });
-      console.log('Email service initialized successfully');
+      // Check if SendGrid API key is available
+      if (process.env.SENDGRID_API_KEY) {
+        sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+        this.initialized = true;
+        console.log('✅ Email service initialized with SendGrid');
+        return;
+      }
+
+      // Fallback check for old Gmail config (for backward compatibility)
+      if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
+        console.warn('⚠️  Email service not fully configured');
+        console.warn('   For production: Set SENDGRID_API_KEY environment variable');
+        console.warn('   Get free API key at: https://signup.sendgrid.com/');
+        this.initialized = false;
+        return;
+      }
+
+      console.warn('⚠️  Gmail SMTP detected - this may not work on Render due to port blocking');
+      console.warn('   Recommended: Switch to SendGrid (free 100 emails/day)');
+      this.initialized = false;
     } catch (error) {
-      console.error('Failed to initialize email service:', error);
+      console.error('❌ Failed to initialize email service:', error);
+      this.initialized = false;
     }
   }
 
   async sendOTP(email, otp) {
     try {
-      if (!this.transporter) {
-        throw new Error('Email service not initialized');
+      if (!this.initialized) {
+        console.error('❌ Email service not initialized - check SENDGRID_API_KEY');
+        return { success: false, error: 'Email service not configured' };
       }
 
-      const mailOptions = {
-        from: `"Thursdate" <${process.env.EMAIL_USER}>`,
+      console.log(`📧 Sending OTP to ${email}...`);
+
+      const msg = {
         to: email,
+        from: {
+          email: process.env.SENDGRID_FROM_EMAIL || 'noreply@thursdate.app',
+          name: 'Thursdate'
+        },
         subject: 'Your Thursdate Verification Code',
         html: `
           <!DOCTYPE html>
@@ -71,27 +90,21 @@ class EmailService {
         `
       };
 
-      const info = await this.transporter.sendMail(mailOptions);
-      console.log('Email sent successfully:', info.messageId);
-      return { success: true, messageId: info.messageId };
+      await sgMail.send(msg);
+      console.log('✅ OTP email sent successfully to', email);
+      return { success: true };
     } catch (error) {
-      console.error('Error sending email:', error);
+      console.error('❌ Error sending email:', error.message);
+      if (error.response) {
+        console.error('   SendGrid error:', error.response.body);
+      }
       return { success: false, error: error.message };
     }
   }
 
   async verifyConnection() {
-    try {
-      if (!this.transporter) {
-        return false;
-      }
-      await this.transporter.verify();
-      console.log('Email service connection verified');
-      return true;
-    } catch (error) {
-      console.error('Email service connection failed:', error);
-      return false;
-    }
+    // SendGrid uses API key authentication, no need to verify connection
+    return this.initialized;
   }
 }
 
