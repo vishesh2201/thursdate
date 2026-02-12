@@ -49,45 +49,87 @@ class EmailService {
           email: process.env.SENDGRID_FROM_EMAIL || 'noreply@thursdate.app',
           name: 'Thursdate'
         },
+        replyTo: process.env.SENDGRID_FROM_EMAIL || 'sundatetheapp@gmail.com',
         subject: 'Your Thursdate Verification Code',
+        // Plain text version (important for spam filters)
+        text: `
+Hello,
+
+Thank you for signing up with Thursdate! 
+
+Your verification code is: ${otp}
+
+This code will expire in 10 minutes.
+
+If you didn't request this code, please ignore this email.
+
+Best regards,
+Thursdate Team
+
+© ${new Date().getFullYear()} Thursdate. All rights reserved.
+        `.trim(),
+        // HTML version (simpler design, less likely to trigger spam filters)
         html: `
           <!DOCTYPE html>
-          <html>
+          <html lang="en">
           <head>
-            <style>
-              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-              .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-              .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-              .otp-box { background: white; border: 2px dashed #667eea; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0; }
-              .otp-code { font-size: 36px; font-weight: bold; color: #667eea; letter-spacing: 8px; }
-              .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
-            </style>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Thursdate Verification Code</title>
           </head>
-          <body>
-            <div class="container">
-              <div class="header">
-                <h1>Thursdate Email Verification</h1>
-              </div>
-              <div class="content">
-                <p>Hello,</p>
-                <p>Thank you for signing up with Thursdate! Please use the following verification code to complete your email verification:</p>
-                
-                <div class="otp-box">
-                  <div class="otp-code">${otp}</div>
-                </div>
-                
-                <p><strong>This code will expire in 10 minutes.</strong></p>
-                <p>If you didn't request this code, please ignore this email.</p>
-                
-                <div class="footer">
-                  <p>© ${new Date().getFullYear()} Thursdate. All rights reserved.</p>
-                </div>
-              </div>
-            </div>
+          <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f5f5f5; padding: 20px 0;">
+              <tr>
+                <td align="center">
+                  <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <!-- Header -->
+                    <tr>
+                      <td style="background-color: #6366f1; padding: 40px 20px; text-align: center;">
+                        <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">Thursdate</h1>
+                      </td>
+                    </tr>
+                    <!-- Content -->
+                    <tr>
+                      <td style="padding: 40px 30px;">
+                        <p style="margin: 0 0 20px; color: #333333; font-size: 16px; line-height: 1.5;">Hello,</p>
+                        <p style="margin: 0 0 30px; color: #333333; font-size: 16px; line-height: 1.5;">Thank you for signing up with Thursdate! Please use the following verification code to complete your email verification:</p>
+                        
+                        <!-- OTP Box -->
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 30px 0;">
+                          <tr>
+                            <td align="center" style="background-color: #f8f9fa; border: 2px solid #6366f1; border-radius: 8px; padding: 30px;">
+                              <span style="font-size: 32px; font-weight: bold; color: #6366f1; letter-spacing: 8px;">${otp}</span>
+                            </td>
+                          </tr>
+                        </table>
+                        
+                        <p style="margin: 20px 0 0; color: #333333; font-size: 16px; line-height: 1.5;"><strong>This code will expire in 10 minutes.</strong></p>
+                        <p style="margin: 20px 0 0; color: #666666; font-size: 14px; line-height: 1.5;">If you didn't request this code, please ignore this email.</p>
+                      </td>
+                    </tr>
+                    <!-- Footer -->
+                    <tr>
+                      <td style="background-color: #f8f9fa; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+                        <p style="margin: 0; color: #666666; font-size: 12px;">© ${new Date().getFullYear()} Thursdate. All rights reserved.</p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
           </body>
           </html>
-        `
+        `,
+        // Mail settings to improve deliverability
+        trackingSettings: {
+          clickTracking: { enable: false },
+          openTracking: { enable: false }
+        },
+        mailSettings: {
+          bypassListManagement: { enable: false },
+          footer: { enable: false },
+          sandboxMode: { enable: false }
+        }
       };
 
       await sgMail.send(msg);
