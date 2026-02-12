@@ -286,6 +286,13 @@ router.put('/profile', auth, async (req, res) => {
         const currentUser = currentUsers[0];
         const currentIntent = safeJsonParse(currentUser.intent, {});
         
+        // Helper function to convert empty/invalid integers to null
+        const parseIntOrNull = (value) => {
+            if (value === null || value === undefined || value === '') return null;
+            const parsed = parseInt(value);
+            return isNaN(parsed) ? null : parsed;
+        };
+        
         // 🔍 DEBUG: Log incoming data
         console.log('PUT /profile - Received data:', {
             hasInterests: !!req.body.interests,
@@ -333,7 +340,7 @@ router.put('/profile', auth, async (req, res) => {
             pets !== undefined ? pets : currentUser.pets,
             drinking !== undefined ? drinking : currentUser.drinking,
             smoking !== undefined ? smoking : currentUser.smoking,
-            height !== undefined ? height : currentUser.height,
+            height !== undefined ? parseIntOrNull(height) : currentUser.height,
             religiousLevel !== undefined ? religiousLevel : currentUser.religious_level,
             kidsPreference !== undefined ? kidsPreference : currentUser.kids_preference,
             foodPreference !== undefined ? foodPreference : currentUser.food_preference,

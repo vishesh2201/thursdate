@@ -1046,7 +1046,7 @@ export default function ChatConversation() {
             </div>
 
             {/* Input Area */}
-            <div className="bg-gradient-to-t from-black/60 via-black/40 to-transparent px-safe px-3 sm:px-4 py-3 pb-safe pb-6 sm:pb-8 z-10 relative">
+            <div className="bg-gradient-to-t from-black/60 via-black/40 to-transparent px-4 sm:px-4 py-3 pb-safe pb-6 sm:pb-8 z-10 relative max-w-full">
                 {/* ✅ Level Up Popups - Only show if NOT declined temporarily AND has valid action */}
                 <LevelUpPopup
                     show={
@@ -1081,7 +1081,7 @@ export default function ChatConversation() {
                     onDismiss={() => setShowLevel2Unlocked(false)}
                 />
                 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2 max-w-full">
                     {/* Voice Preview Mode - WhatsApp style */}
                     {recordedAudio ? (
                         <>
@@ -1208,14 +1208,14 @@ export default function ChatConversation() {
                     ) : (
                         /* Normal Mode */
                         <>
-                            <div className="flex-1 bg-white rounded-full px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2 shadow-lg">
+                            <div className="flex-1 bg-white rounded-full px-3 sm:px-4 py-2 sm:py-2.5 flex items-center gap-1.5 sm:gap-2 shadow-lg min-w-0">
                                 {/* Emoji Button - Opens native keyboard */}
                                 <button
                                     type="button"
                                     onClick={() => inputRef.current?.focus()}
-                                    className="flex-shrink-0 active:scale-95 transition-transform p-1"
+                                    className="flex-shrink-0 active:scale-95 transition-transform p-0.5"
                                 >
-                                    <svg className="w-6 h-6 sm:w-5 sm:h-5 text-gray-500 active:text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg className="w-5 h-5 sm:w-5 sm:h-5 text-gray-500 active:text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
                                 </button>
@@ -1228,7 +1228,7 @@ export default function ChatConversation() {
                                     onChange={handleTyping}
                                     onKeyPress={handleKeyPress}
                                     placeholder="Message"
-                                    className="flex-1 bg-transparent text-gray-800 placeholder-gray-400 outline-none text-[15px] sm:text-sm"
+                                    className="flex-1 bg-transparent text-gray-800 placeholder-gray-400 outline-none text-sm sm:text-sm min-w-0"
                                 />
                             </div>
 
@@ -1236,7 +1236,7 @@ export default function ChatConversation() {
                                 <button
                                     type="button"
                                     onClick={handleSendMessage}
-                                    className="w-10 h-10 sm:w-9 sm:h-9 bg-white rounded-full flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform shadow-md"
+                                    className="w-9 h-9 sm:w-9 sm:h-9 bg-white rounded-full flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform shadow-md"
                                 >
                                     <svg
                                         xmlns="http://www.w3.org/2000/svg"
@@ -1268,7 +1268,7 @@ export default function ChatConversation() {
                                 <button
                                     type="button"
                                     onClick={startRecording}
-                                    className="w-10 h-10 sm:w-9 sm:h-9 bg-white rounded-full flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform shadow-md"
+                                    className="w-9 h-9 sm:w-9 sm:h-9 bg-white rounded-full flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform shadow-md"
                                 >
                                     <img src="/chatMic.svg" alt="Microphone" className="w-5 h-5" />
                                 </button>
