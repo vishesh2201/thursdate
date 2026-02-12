@@ -133,6 +133,12 @@ export const authAPI = {
         }
 
         const data = await response.json();
+        
+        // Store token if returned (auto-login after OTP verification)
+        if (data.token) {
+            setToken(data.token);
+        }
+        
         return data;
     },
 

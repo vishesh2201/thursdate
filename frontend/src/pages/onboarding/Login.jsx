@@ -51,11 +51,10 @@ export default function Login() {
     setLoading(true);
     setError("");
     try {
-      await authAPI.verifyEmailOTP(email, otp);
-      // Login (no password)
-      await authAPI.login(email, "");
+      // Verify OTP - returns token and user data on success
+      const response = await authAPI.verifyEmailOTP(email, otp);
       // Get user profile to determine where to navigate
-      const userData = await userAPI.getProfile();
+      const userData = response.user || await userAPI.getProfile();
       if (userData.approval && userData.onboardingComplete) {
         navigate("/home");
         return;
