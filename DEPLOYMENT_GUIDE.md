@@ -55,6 +55,8 @@ CLOUDINARY_API_KEY=<from-cloudinary-console>
 CLOUDINARY_API_SECRET=<from-cloudinary-console>
 ADMIN_EMAILS=admin@example.com
 FRONTEND_URL=https://thursdate.vercel.app
+EMAIL_USER=<your-gmail-address>
+EMAIL_PASSWORD=<gmail-app-password>
 ```
 
 **Generate JWT Secret:**
@@ -62,15 +64,19 @@ FRONTEND_URL=https://thursdate.vercel.app
 node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 ```
 
-**Optional Variables (if using):**
+**How to get Gmail App Password:**
+1. Go to https://myaccount.google.com/security
+2. Enable 2-Step Verification if not already enabled
+3. Go to https://myaccount.google.com/apppasswords
+4. Create app password for "Mail"
+5. Copy the 16-character password (no spaces)
+6. Use this as EMAIL_PASSWORD
+
+**Optional Variables (if using AWS Rekognition for face verification):**
 ```bash
 AWS_REGION=us-east-1
 AWS_ACCESS_KEY_ID=<your-key>
 AWS_SECRET_ACCESS_KEY=<your-secret>
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_USER=<your-email>
-EMAIL_PASSWORD=<app-password>
 ```
 
 #### 1.4 Deploy Backend
