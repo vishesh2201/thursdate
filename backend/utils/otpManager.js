@@ -54,11 +54,19 @@ class OTPManager {
   verifyOTP(email, otp) {
     const stored = this.otps.get(email);
 
+    console.log('🔍 OTP Verification Debug:');
+    console.log('   Email:', email);
+    console.log('   Input OTP:', otp, 'Type:', typeof otp, 'Length:', otp?.length);
+    console.log('   Stored OTP:', stored?.otp, 'Type:', typeof stored?.otp, 'Length:', stored?.otp?.length);
+    console.log('   Comparison:', stored?.otp === otp);
+
     if (!stored) {
+      console.log('   ❌ No OTP found in storage');
       return { valid: false, error: 'No OTP found. Please request a new one.' };
     }
 
     if (Date.now() > stored.expiresAt) {
+      console.log('   ❌ OTP expired');
       this.otps.delete(email);
       return { valid: false, error: 'OTP has expired. Please request a new one.' };
     }
@@ -66,17 +74,25 @@ class OTPManager {
     stored.attempts++;
 
     if (stored.attempts > 3) {
+      console.log('   ❌ Too many attempts');
       this.otps.delete(email);
       return { valid: false, error: 'Too many failed attempts. Please request a new OTP.' };
     }
 
-    if (stored.otp !== otp) {
+    // Normalize both values to strings and trim whitespace
+    const storedOTP = String(stored.otp).trim();
+    const inputOTP = String(otp).trim();
+
+    if (storedOTP !== inputOTP) {
+      console.log('   ❌ OTP mismatch:', { stored: storedOTP, input: inputOTP });
       return { 
         valid: false, 
         error: `Invalid OTP. ${4 - stored.attempts} attempts remaining.`,
         attemptsRemaining: 3 - stored.attempts
       };
     }
+
+    console.log('   ✅ OTP valid!');
 
     // OTP is valid
     this.otps.delete(email);

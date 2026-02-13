@@ -168,13 +168,18 @@ export default function ProfileQuestions() {
         setLoading(true);
         try {
             const currentProfile = await userAPI.getProfile();
+            
+            // Parse height and convert to null if invalid
+            const parsedHeight = parseInt(height);
+            const validHeight = !isNaN(parsedHeight) && parsedHeight > 0 ? parsedHeight : null;
+            
             await userAPI.updateProfile({
                 ...currentProfile,
                 // ✅ NEW: Send matchable fields at root level for hybrid storage
                 pets,
                 drinking,
                 smoking,
-                height: parseInt(height),
+                height: validHeight,
                 religiousLevel,
                 kidsPreference: kids,
                 foodPreference,

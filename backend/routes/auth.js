@@ -163,16 +163,21 @@ router.post('/verify-email-otp', async (req, res) => {
   try {
     const { email, otp } = req.body;
     
+    console.log('📥 Verify OTP Request:', { email, otp, type: typeof otp, length: otp?.length });
+    
     if (!email || !otp) {
       return res.status(400).json({ error: 'Email and OTP are required' });
     }
     
-    if (otp.length !== 6) {
+    // Normalize OTP (trim whitespace, convert to string)
+    const normalizedOTP = String(otp).trim();
+    
+    if (normalizedOTP.length !== 6) {
       return res.status(400).json({ error: 'OTP must be 6 digits' });
     }
     
     // Verify OTP
-    const result = otpManager.verifyOTP(email, otp);
+    const result = otpManager.verifyOTP(email, normalizedOTP);
     
     if (!result.valid) {
       return res.status(400).json({ 
@@ -181,30 +186,43 @@ router.post('/verify-email-otp', async (req, res) => {
       });
     }
     
-    // OTP verified successfully
+    // OTP verified successfully - now check/create user and generate token
     console.log(`Email verified successfully for: ${email}`);
     
     // Check if user exists
-    const [users] = await pool.execute(
-      'SELECT id, email FROM users WHERE email = ?',
+    const [existingUsers] = await pool.execute(
+      'SELECT id, email, approval, onboarding_complete FROM users WHERE email = ?',
       [email]
     );
     
     let userId;
+    let userData = {};
     
-    if (users.length === 0) {
-      // New user - create account
-      const hashedPassword = await bcrypt.hash('otp-verified', 10);
+    if (existingUsers.length === 0) {
+      // Create new user (passwordless - using email OTP login)
       const [result] = await pool.execute(
         'INSERT INTO users (email, password, approval, onboarding_complete) VALUES (?, ?, ?, ?)',
-        [email, hashedPassword, false, false]
+        [email, '', false, false] // Empty password for OTP-only users
       );
       userId = result.insertId;
-      console.log(`New user created via OTP: ${email}, userId: ${userId}`);
+      userData = {
+        id: userId,
+        email,
+        approval: false,
+        onboardingComplete: false
+      };
+      console.log(`✅ New user created via OTP: ${email} (ID: ${userId})`);
     } else {
       // Existing user
-      userId = users[0].id;
-      console.log(`Existing user logged in via OTP: ${email}, userId: ${userId}`);
+      const user = existingUsers[0];
+      userId = user.id;
+      userData = {
+        id: user.id,
+        email: user.email,
+        approval: user.approval,
+        onboardingComplete: user.onboarding_complete
+      };
+      console.log(`✅ Existing user logged in via OTP: ${email} (ID: ${userId})`);
     }
     
     // Generate JWT token
@@ -218,7 +236,8 @@ router.post('/verify-email-otp', async (req, res) => {
       message: 'Email verified successfully',
       verified: true,
       token,
-      userId
+      userId,
+      user: userData
     });
     
   } catch (error) {

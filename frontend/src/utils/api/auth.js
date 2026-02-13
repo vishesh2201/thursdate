@@ -134,12 +134,9 @@ export const authAPI = {
 
         const data = await response.json();
         
-        // Store token if returned (passwordless login/signup)
+        // Store token if returned (auto-login after OTP verification)
         if (data.token) {
-            localStorage.setItem('token', data.token);
-            if (data.userId) {
-                localStorage.setItem('userId', data.userId);
-            }
+            setToken(data.token);
         }
         
         return data;

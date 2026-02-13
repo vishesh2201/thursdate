@@ -51,12 +51,18 @@ export default function Login() {
     setLoading(true);
     setError("");
     try {
-      await authAPI.verifyEmailOTP(email, otp);
-      // Token is now automatically stored by verifyEmailOTP
-      // User account is created (if new) or logged in (if existing) by backend
+      // Verify OTP - returns token and user data on success
+      const response = await authAPI.verifyEmailOTP(email, otp);
 
-      // Get user profile to determine where to navigate
-      const userData = await userAPI.getProfile();
+      // Use user data from response (no need for additional API call)
+      const userData = response.user;
+
+      if (!userData) {
+        setError('Failed to get user data');
+        return;
+      }
+
+      // Navigation logic based on approval and onboarding status
       if (userData.approval && userData.onboardingComplete) {
         navigate("/home");
         return;
