@@ -150,36 +150,39 @@ export default function ProfileQuestions() {
     }, []);
 
     // Auto-save onboarding state to localStorage whenever key fields change
-    useEffect(() => {
-        const state = {
-            step,
-            education,
-            educationDetail,
-            languages,
-            canCode,
-            codingLanguages,
-            jobTitle,
-            companyName,
-            pets,
-            foodPreference,
-            sleepSchedule,
-            drinking,
-            smoking,
-            height,
-            dateBill,
-            kids,
-            religiousLevel,
-            religion,
-            customReligion,
-            favoriteCafe,
-            relationshipValues,
-            livingSituation,
-            livingSituationCustom,
-            facePhotos,
-        };
-        saveOnboardingState(STORAGE_KEYS.PROFILE_QUESTIONS, state);
-    }, [step, education, educationDetail, languages, canCode, codingLanguages, jobTitle, companyName, pets, foodPreference, sleepSchedule, drinking, smoking, height, dateBill, kids, religiousLevel, religion, customReligion, favoriteCafe, relationshipValues, livingSituation, livingSituationCustom, facePhotos]);
+  // ✅ FIX: Only save after initial loading is complete to avoid race condition
+  useEffect(() => {
+    if (initialLoading) return; // Don't save during initial load
 
+    const state = {
+      step,
+      education,
+      educationDetail,
+      languages,
+      canCode,
+      codingLanguages,
+      jobTitle,
+      companyName,
+      pets,
+      foodPreference,
+      sleepSchedule,
+      drinking,
+      smoking,
+      height,
+      dateBill,
+      kids,
+      religiousLevel,
+      religion,
+      customReligion,
+      favoriteCafe,
+      relationshipValues,
+      livingSituation,
+      livingSituationCustom,
+      facePhotos,
+    };
+    console.log('[ProfileQuestions] Auto-saving state:', { step, hasData: !!education || languages.length > 0 });
+    saveOnboardingState(STORAGE_KEYS.PROFILE_QUESTIONS, state);
+  }, [initialLoading, step, education, educationDetail, languages, canCode, codingLanguages, jobTitle, companyName, pets, foodPreference, sleepSchedule, drinking, smoking, height, dateBill, kids, religiousLevel, religion, customReligion, favoriteCafe, relationshipValues, livingSituation, livingSituationCustom, facePhotos]);
     const canProceed = () => {
         switch (step) {
             case 1: return !!education && !!educationDetail;

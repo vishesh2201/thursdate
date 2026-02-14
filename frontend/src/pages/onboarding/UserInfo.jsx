@@ -124,6 +124,7 @@ export default function UserInfo() {
   const [showPicModal, setShowPicModal] = useState(false);
   const [uploadingPic, setUploadingPic] = useState(false);
   const [picError, setPicError] = useState("");
+  const [initialLoading, setInitialLoading] = useState(true);
 
   const navigate = useNavigate();
 
@@ -173,6 +174,8 @@ export default function UserInfo() {
         }
       } catch (err) {
         console.error('Failed to load profile', err);
+      } finally {
+        if (mounted) setInitialLoading(false);
       }
     };
     loadProfile();
@@ -244,7 +247,10 @@ export default function UserInfo() {
   }, [debouncedFavouritePlaceInput]);
 
   // Auto-save onboarding state to localStorage whenever key fields change
+  // ✅ FIX: Only save after initial loading is complete to avoid race condition
   useEffect(() => {
+    if (initialLoading) return; // Don't save during initial load
+
     const state = {
       step,
       firstName,
@@ -258,8 +264,9 @@ export default function UserInfo() {
       favouritePlacesToGo,
       faceVerificationUrl,
     };
+    console.log('[UserInfo] Auto-saving state:', { step, hasData: !!firstName || !!lastName });
     saveOnboardingState(STORAGE_KEYS.USER_INFO, state);
-  }, [step, firstName, lastName, gender, customGender, dob, currentLocation, favouriteTravelDestination, lastHolidayPlaces, favouritePlacesToGo, faceVerificationUrl]);
+  }, [initialLoading, step, firstName, lastName, gender, customGender, dob, currentLocation, favouriteTravelDestination, lastHolidayPlaces, favouritePlacesToGo, faceVerificationUrl]);
 
   // Adjust pickerDay if month/year changes and the day becomes invalid
   const updatePickerDayBasedOnMonthYear = useCallback((year, month, day) => {

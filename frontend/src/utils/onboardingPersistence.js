@@ -14,12 +14,17 @@ const STORAGE_KEYS = {
  */
 export function saveOnboardingState(key, data) {
   try {
-    localStorage.setItem(key, JSON.stringify({
+    const stateWithTimestamp = {
       ...data,
       timestamp: Date.now(),
-    }));
+    };
+    localStorage.setItem(key, JSON.stringify(stateWithTimestamp));
+    console.log(`[Persistence] Saved ${key}:`, { 
+      step: data.step, 
+      dataSize: JSON.stringify(stateWithTimestamp).length 
+    });
   } catch (err) {
-    console.error('Failed to save onboarding state:', err);
+    console.error('[Persistence] Failed to save onboarding state:', err);
   }
 }
 
@@ -32,20 +37,28 @@ export function saveOnboardingState(key, data) {
 export function loadOnboardingState(key, maxAge = 7 * 24 * 60 * 60 * 1000) {
   try {
     const saved = localStorage.getItem(key);
-    if (!saved) return null;
+    if (!saved) {
+      console.log(`[Persistence] No saved state for ${key}`);
+      return null;
+    }
 
     const parsed = JSON.parse(saved);
     const age = Date.now() - (parsed.timestamp || 0);
 
     // Clear expired data
     if (age > maxAge) {
+      console.log(`[Persistence] Expired state for ${key} (${Math.round(age / 1000 / 60 / 60 / 24)} days old)`);
       localStorage.removeItem(key);
       return null;
     }
 
+    console.log(`[Persistence] Loaded ${key}:`, { 
+      step: parsed.step, 
+      ageHours: Math.round(age / 1000 / 60 / 60) 
+    });
     return parsed;
   } catch (err) {
-    console.error('Failed to load onboarding state:', err);
+    console.error('[Persistence] Failed to load onboarding state:', err);
     return null;
   }
 }
@@ -57,8 +70,9 @@ export function loadOnboardingState(key, maxAge = 7 * 24 * 60 * 60 * 1000) {
 export function clearOnboardingState(key) {
   try {
     localStorage.removeItem(key);
+    console.log(`[Persistence] Cleared ${key}`);
   } catch (err) {
-    console.error('Failed to clear onboarding state:', err);
+    console.error('[Persistence] Failed to clear onboarding state:', err);
   }
 }
 

@@ -171,7 +171,10 @@ export default function UserIntent() {
   };
 
   // Auto-save onboarding state to localStorage whenever key fields change
+  // ✅ FIX: Only save after initial loading is complete to avoid race condition
   useEffect(() => {
+    if (initialLoading) return; // Don't save during initial load
+
     const state = {
       step,
       purpose,
@@ -187,8 +190,9 @@ export default function UserIntent() {
       profileImageUrl,
       lifestyleImageUrls,
     };
+    console.log('[UserIntent] Auto-saving state:', { step, hasData: !!purpose || interests.length > 0 });
     saveOnboardingState(STORAGE_KEYS.USER_INTENT, state);
-  }, [step, purpose, relationshipVibe, interestedGender, ageRange, bio, interests, tvShows, movies, watchList, artistsBands, profileImageUrl, lifestyleImageUrls]);
+  }, [initialLoading, step, purpose, relationshipVibe, interestedGender, ageRange, bio, interests, tvShows, movies, watchList, artistsBands, profileImageUrl, lifestyleImageUrls]);
 
   useEffect(() => {
     if (bioMode !== 'Listen' && listening) {
