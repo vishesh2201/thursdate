@@ -37,6 +37,9 @@ export default function ChatConversation() {
     const inputRef = useRef(null);
     const audioPreviewRef = useRef(null);
 
+    // ✅ Reply functionality state
+    const [replyingTo, setReplyingTo] = useState(null);
+
     // ✅ Level system state
     const [levelStatus, setLevelStatus] = useState(null);
     const [showLevel2Unlocked, setShowLevel2Unlocked] = useState(false);
@@ -398,7 +401,17 @@ export default function ChatConversation() {
         if (!message.trim()) return;
 
         const textToSend = message.trim();
+        const replyToMessageId = replyingTo?.id || null;
+        const repliedMessageData = replyingTo ? {
+            id: replyingTo.id,
+            content: replyingTo.content,
+            messageType: replyingTo.messageType,
+            senderId: replyingTo.senderId,
+            senderFirstName: replyingTo.sender?.firstName || (replyingTo.isSent ? 'You' : otherUser?.firstName)
+        } : null;
+        
         setMessage('');
+        setReplyingTo(null); // Clear reply state
 
         // Stop typing indicator
         socketService.stopTyping(conversationId, otherUser.id);
@@ -412,7 +425,9 @@ export default function ChatConversation() {
             isSent: true,
             status: 'SENDING',
             createdAt: new Date().toISOString(),
-            senderId: JSON.parse(atob(localStorage.getItem('token').split('.')[1])).userId
+            senderId: JSON.parse(atob(localStorage.getItem('token').split('.')[1])).userId,
+            replyToMessageId,
+            repliedMessage: repliedMessageData
         };
 
         // Add message to UI immediately
@@ -421,7 +436,7 @@ export default function ChatConversation() {
 
         try {
             // Use Socket.IO for instant message delivery (faster than REST API)
-            const newMsg = await socketService.sendMessage(conversationId, 'text', textToSend);
+            const newMsg = await socketService.sendMessage(conversationId, 'text', textToSend, null, replyToMessageId);
             console.log('✅ Message sent via socket, received response:', newMsg);
 
             // Replace optimistic message with real message
@@ -435,7 +450,7 @@ export default function ChatConversation() {
             // Fallback to REST API if socket fails
             try {
                 console.log('🔄 Attempting fallback to REST API...');
-                const newMsg = await chatAPI.sendMessage(conversationId, 'text', textToSend);
+                const newMsg = await chatAPI.sendMessage(conversationId, 'text', textToSend, null, replyToMessageId);
                 console.log('✅ Message sent via REST API:', newMsg);
 
                 const normalizedMsg = normalizeMessage(newMsg);
@@ -958,89 +973,20 @@ export default function ChatConversation() {
                 ) : messages.length === 0 ? (
                     <div className="text-center text-white/60 py-8">No messages yet. Say hi!</div>
                 ) : (
-                    messages.map((msg) => (
-                        <div
-                            key={msg.id}
-                            className={`flex ${msg.isSent ? 'justify-end' : 'justify-start'}`}
-                            onContextMenu={(e) => {
-                                e.preventDefault();
-                                handleMessageLongPress(msg);
-                            }}
-                            onClick={(e) => {
-                                // Long press simulation for mobile
-                                if (e.detail === 2) { // Double click
-                                    handleMessageLongPress(msg);
-                                }
-                            }}
-                        >
-                            <div
-                                className={`max-w-[85%] sm:max-w-[75%] md:max-w-[60%] rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 overflow-hidden shadow-md ${msg.isSent
-                                    ? 'bg-white text-gray-800 rounded-br-md'
-                                    : 'bg-gradient-to-br from-[#3A3A3C] to-[#2C2C2E] text-white rounded-bl-md'
-                                    }`}
-                            >
-
-                                {msg.messageType === 'voice' || msg.type === 'VOICE' ? (
-                                    <audio
-                                        src={msg.content}
-                                        controls
-                                        className="max-w-full"
-                                        style={{
-                                            height: '32px',
-                                            filter: msg.isSent ? 'invert(0)' : 'invert(1)'
-                                        }}
-                                    />
-                                ) : (
-                                    <p className="text-[15px] sm:text-sm leading-relaxed break-words">{msg.content}</p>
-                                )}
-                                <div className={`flex items-center gap-1.5 mt-1.5 justify-end ${msg.isSent ? 'text-gray-500' : 'text-white/60'}`}>
-                                    <span className="text-[11px] sm:text-xs">{formatTime(msg.createdAt)}</span>
-                                    {msg.isSent && (
-                                        <div className="relative flex items-center ">
-                                            {console.log('Rendering msg', msg.id, 'status:', msg.status, 'isRead:', msg.isRead)}
-                                            {msg.status === 'SENDING' ? (
-                                                // Clock icon for sending messages
-                                                <svg className="w-4 h-4 text-gray-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <circle cx="12" cy="12" r="10" strokeWidth={2} />
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" />
-                                                </svg>
-                                            ) : msg.status === 'FAILED' ? (
-                                                // Warning icon for failed messages
-                                                <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                            ) : msg.status === 'READ' || msg.isRead ? (
-                                                // Double blue ticks for read messages
-                                                <div className="flex -space-x-2">
-                                                    <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                                                    </svg>
-                                                    <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                                                    </svg>
-                                                </div>
-                                            ) : msg.status === 'DELIVERED' ? (
-                                                // Double grey ticks for delivered messages
-                                                <div className="flex -space-x-2">
-                                                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                                                    </svg>
-                                                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                                                    </svg>
-                                                </div>
-                                            ) : (
-                                                // Single tick for sent but not delivered
-                                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                                                </svg>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    ))
+                    messages.map((msg) => {
+                        const currentUserId = JSON.parse(atob(localStorage.getItem('token').split('.')[1])).userId;
+                        return (
+                            <MessageBubble
+                                key={msg.id}
+                                msg={msg}
+                                currentUserId={currentUserId}
+                                otherUser={otherUser}
+                                onReply={setReplyingTo}
+                                onLongPress={handleMessageLongPress}
+                                formatTime={formatTime}
+                            />
+                        );
+                    })
                 )}
                 <div ref={messagesEndRef} />
             </div>
@@ -1080,6 +1026,33 @@ export default function ChatConversation() {
                     show={showLevel2Unlocked}
                     onDismiss={() => setShowLevel2Unlocked(false)}
                 />
+                
+                {/* Reply Preview Bar */}
+                {replyingTo && (
+                    <div className="mb-3 bg-white/20 backdrop-blur-sm rounded-xl px-4 py-3 flex items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                                <svg className="w-4 h-4 text-white flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                </svg>
+                                <span className="text-white font-medium text-sm">
+                                    Replying to {replyingTo.isSent ? 'yourself' : (otherUser?.firstName || 'User')}
+                                </span>
+                            </div>
+                            <div className="text-white/80 text-sm truncate pl-6">
+                                {replyingTo.messageType === 'voice' ? '🎤 Voice message' : replyingTo.content}
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setReplyingTo(null)}
+                            className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+                        >
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                )}
                 
                 <div className="flex items-center gap-1.5 sm:gap-2 max-w-full">
                     {/* Voice Preview Mode - WhatsApp style */}
@@ -1460,6 +1433,155 @@ export default function ChatConversation() {
                     </div>
                 </div>
             )}
+        </div>
+    );
+}
+
+// Message Bubble Component with Swipe-to-Reply
+function MessageBubble({ msg, currentUserId, otherUser, onReply, onLongPress, formatTime }) {
+    const [swipeX, setSwipeX] = useState(0);
+    const [touchStartX, setTouchStartX] = useState(0);
+    const [isSwiping, setIsSwiping] = useState(false);
+    const bubbleRef = useRef(null);
+
+    const handleTouchStart = (e) => {
+        setTouchStartX(e.touches[0].clientX);
+        setIsSwiping(false);
+    };
+
+    const handleTouchMove = (e) => {
+        const currentX = e.touches[0].clientX;
+        const diff = currentX - touchStartX;
+        
+        // Only allow swipe in the reply direction (right for sent, left for received)
+        const maxSwipe = 80;
+        if (msg.isSent && diff < 0) {
+            // Sent messages: swipe left
+            setSwipeX(Math.max(diff, -maxSwipe));
+            setIsSwiping(true);
+        } else if (!msg.isSent && diff > 0) {
+            // Received messages: swipe right
+            setSwipeX(Math.min(diff, maxSwipe));
+            setIsSwiping(true);
+        }
+    };
+
+    const handleTouchEnd = () => {
+        const threshold = 60;
+        
+        if (Math.abs(swipeX) > threshold) {
+            // Trigger reply
+            onReply(msg);
+        }
+        
+        // Reset swipe
+        setSwipeX(0);
+        setIsSwiping(false);
+    };
+
+    return (
+        <div className={`flex ${msg.isSent ? 'justify-end' : 'justify-start'} relative`}>
+            {/* Reply Icon - Shows during swipe */}
+            {isSwiping && Math.abs(swipeX) > 30 && (
+                <div className={`absolute top-1/2 -translate-y-1/2 ${msg.isSent ? 'right-full mr-4' : 'left-full ml-4'}`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-opacity ${Math.abs(swipeX) > 60 ? 'bg-blue-500' : 'bg-gray-400'}`}>
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                        </svg>
+                    </div>
+                </div>
+            )}
+
+            <div
+                ref={bubbleRef}
+                style={{
+                    transform: `translateX(${swipeX}px)`,
+                    transition: isSwiping ? 'none' : 'transform 0.3s ease-out'
+                }}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                onContextMenu={(e) => {
+                    e.preventDefault();
+                    onLongPress(msg);
+                }}
+                onClick={(e) => {
+                    if (e.detail === 2) {
+                        onLongPress(msg);
+                    }
+                }}
+                className={`max-w-[85%] sm:max-w-[75%] md:max-w-[60%] rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 overflow-hidden shadow-md ${
+                    msg.isSent
+                        ? 'bg-white text-gray-800 rounded-br-md'
+                        : 'bg-gradient-to-br from-[#3A3A3C] to-[#2C2C2E] text-white rounded-bl-md'
+                }`}
+            >
+                {/* Replied Message Preview */}
+                {msg.repliedMessage && (
+                    <div className={`mb-2 pl-3 border-l-4 ${msg.isSent ? 'border-blue-500 bg-gray-50' : 'border-white/50 bg-white/10'} rounded-r px-2 py-1.5`}>
+                        <div className={`text-xs font-semibold mb-0.5 ${msg.isSent ? 'text-blue-600' : 'text-blue-300'}`}>
+                            {msg.repliedMessage.senderId === currentUserId ? 'You' : (msg.repliedMessage.senderFirstName || otherUser?.firstName || 'User')}
+                        </div>
+                        <div className={`text-xs truncate ${msg.isSent ? 'text-gray-600' : 'text-white/70'}`}>
+                            {msg.repliedMessage.messageType === 'voice' ? '🎤 Voice message' : msg.repliedMessage.content}
+                        </div>
+                    </div>
+                )}
+
+                {msg.messageType === 'voice' || msg.type === 'VOICE' ? (
+                    <audio
+                        src={msg.content}
+                        controls
+                        className="max-w-full"
+                        style={{
+                            height: '32px',
+                            filter: msg.isSent ? 'invert(0)' : 'invert(1)'
+                        }}
+                    />
+                ) : (
+                    <p className="text-[15px] sm:text-sm leading-relaxed break-words">{msg.content}</p>
+                )}
+                
+                <div className={`flex items-center gap-1.5 mt-1.5 justify-end ${msg.isSent ? 'text-gray-500' : 'text-white/60'}`}>
+                    <span className="text-[11px] sm:text-xs">{formatTime(msg.createdAt)}</span>
+                    {msg.isSent && (
+                        <div className="relative flex items-center">
+                            {msg.status === 'SENDING' ? (
+                                <svg className="w-4 h-4 text-gray-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <circle cx="12" cy="12" r="10" strokeWidth={2} />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" />
+                                </svg>
+                            ) : msg.status === 'FAILED' ? (
+                                <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            ) : msg.status === 'READ' || msg.isRead ? (
+                                <div className="flex -space-x-2">
+                                    <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                            ) : msg.status === 'DELIVERED' ? (
+                                <div className="flex -space-x-2">
+                                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                            ) : (
+                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                </svg>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }

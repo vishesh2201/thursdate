@@ -342,10 +342,12 @@ router.put('/profile', auth, async (req, res) => {
             hasDrinking: !!req.body.drinking,
             hasSmoking: !!req.body.smoking,
             hasHeight: !!req.body.height,
+            hasProfilePicUrl: !!req.body.profilePicUrl,
             pets: req.body.pets,
             drinking: req.body.drinking,
             smoking: req.body.smoking,
             height: req.body.height,
+            profilePicUrl: req.body.profilePicUrl,
         });
         
         const {
@@ -418,6 +420,9 @@ router.put('/profile', auth, async (req, res) => {
             WHERE id = ?`,
             updateData 
         );
+        
+        console.log(`[Profile Update] Successfully updated user ${req.user.userId}`);
+        console.log(`[Profile Update] profilePicUrl set to:`, profilePicUrl !== undefined ? profilePicUrl : currentUser.profile_pic_url);
 
         // ✅ Mark Level 2 completed if required fields are provided
         const hasLevel2Data = pets && drinking && smoking && height && religiousLevel && kidsPreference && foodPreference;

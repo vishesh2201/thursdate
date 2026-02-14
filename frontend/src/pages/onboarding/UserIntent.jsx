@@ -287,10 +287,12 @@ export default function UserIntent() {
     setProfileImgError('');
     setProfileImgUploading(true);
     try {
+      console.log('[UserIntent] Uploading profile picture...');
       const res = await uploadAPI.uploadProfilePicture(file);
+      console.log('[UserIntent] Profile picture uploaded successfully:', res.url);
       setProfileImageUrl(res.url);
     } catch (err) {
-      console.error('Upload error', err);
+      console.error('[UserIntent] Upload error:', err);
       setProfileImgError(err.message || 'Failed to upload image. Try again.');
     } finally {
       setProfileImgUploading(false);
@@ -350,7 +352,10 @@ export default function UserIntent() {
     setLoading(true);
     try {
       const currentProfile = await userAPI.getProfile();
-      await userAPI.updateProfile({
+      console.log('[UserIntent] Current profile:', currentProfile);
+      console.log('[UserIntent] Profile image URL to save:', profileImageUrl);
+      
+      const updateData = {
         ...currentProfile,
         // ✅ NEW: Send interests at root level for hybrid storage
         interests,
@@ -371,7 +376,12 @@ export default function UserIntent() {
         },
         profilePicUrl: profileImageUrl,  // ✅ FIX: Changed from profileImageUrl to profilePicUrl to match backend
         onboardingComplete: true, // ✅ Onboarding complete - navigate to Home
-      });
+      };
+      
+      console.log('[UserIntent] Saving profile with data:', updateData);
+      console.log('[UserIntent] profilePicUrl in update:', updateData.profilePicUrl);
+      
+      await userAPI.updateProfile(updateData);
       // Clear saved onboarding state on successful completion
       clearOnboardingState(STORAGE_KEYS.USER_INTENT);
       navigate('/');

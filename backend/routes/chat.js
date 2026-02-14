@@ -253,6 +253,7 @@ router.get('/conversations/:conversationId/messages', auth, async (req, res) => 
       SELECT 
         m.id,
         m.sender_id as senderId,
+        m.reply_to_message_id as replyToMessageId,
         m.type as messageType,
         m.content,
         m.duration as voiceDuration,
@@ -262,9 +263,15 @@ router.get('/conversations/:conversationId/messages', auth, async (req, res) => 
         m.deleted_for_sender,
         m.deleted_for_recipient,
         u.first_name as senderFirstName,
-        u.last_name as senderLastName
+        u.last_name as senderLastName,
+        rm.content as repliedContent,
+        rm.type as repliedMessageType,
+        rm.sender_id as repliedSenderId,
+        ru.first_name as repliedSenderFirstName
       FROM messages m
       JOIN users u ON u.id = m.sender_id
+      LEFT JOIN messages rm ON rm.id = m.reply_to_message_id
+      LEFT JOIN users ru ON ru.id = rm.sender_id
       WHERE m.conversation_id = ?${beforeClause}
         AND (
           (m.sender_id = ? AND m.deleted_for_sender = FALSE) OR
@@ -291,6 +298,14 @@ router.get('/conversations/:conversationId/messages', auth, async (req, res) => 
       messageType: msg.messageType.toLowerCase(),
       content: msg.content,
       voiceDuration: msg.voiceDuration,
+      replyToMessageId: msg.replyToMessageId,
+      repliedMessage: msg.replyToMessageId ? {
+        id: msg.replyToMessageId,
+        content: msg.repliedContent,
+        messageType: msg.repliedMessageType?.toLowerCase(),
+        senderId: msg.repliedSenderId,
+        senderFirstName: msg.repliedSenderFirstName
+      } : null,
       status: msg.status,
       isRead: msg.status === 'READ',
       isSent: msg.senderId === userId,
@@ -313,7 +328,7 @@ router.post('/conversations/:conversationId/messages', auth, async (req, res) =>
   try {
     const userId = req.user.userId;
     const { conversationId } = req.params;
-    const { messageType, content, voiceDuration } = req.body;
+    const { messageType, content, voiceDuration, replyToMessageId } = req.body;
     
     // Validate message type
     if (!['text', 'voice'].includes(messageType)) {
@@ -352,9 +367,9 @@ router.post('/conversations/:conversationId/messages', auth, async (req, res) =>
     
     // Insert message
     const [result] = await pool.execute(
-      `INSERT INTO messages (conversation_id, sender_id, type, content, duration) 
-       VALUES (?, ?, ?, ?, ?)`,
-      [parseInt(conversationId), userId, messageType.toUpperCase(), content, voiceDuration || null]
+      `INSERT INTO messages (conversation_id, sender_id, reply_to_message_id, type, content, duration) 
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [parseInt(conversationId), userId, replyToMessageId || null, messageType.toUpperCase(), content, voiceDuration || null]
     );
     
     // Update conversation's updated_at
@@ -432,15 +447,22 @@ router.post('/conversations/:conversationId/messages', auth, async (req, res) =>
       `SELECT 
         m.id,
         m.sender_id as senderId,
+        m.reply_to_message_id as replyToMessageId,
         m.type as messageType,
         m.content,
         m.duration as voiceDuration,
         m.status as status,
         m.created_at as createdAt,
         u.first_name as senderFirstName,
-        u.last_name as senderLastName
+        u.last_name as senderLastName,
+        rm.content as repliedContent,
+        rm.type as repliedMessageType,
+        rm.sender_id as repliedSenderId,
+        ru.first_name as repliedSenderFirstName
       FROM messages m
       JOIN users u ON u.id = m.sender_id
+      LEFT JOIN messages rm ON rm.id = m.reply_to_message_id
+      LEFT JOIN users ru ON ru.id = rm.sender_id
       WHERE m.id = ?`,
       [result.insertId]
     );
@@ -448,6 +470,14 @@ router.post('/conversations/:conversationId/messages', auth, async (req, res) =>
     const message = {
       id: messages[0].id,
       senderId: messages[0].senderId,
+      replyToMessageId: messages[0].replyToMessageId,
+      repliedMessage: messages[0].replyToMessageId ? {
+        id: messages[0].replyToMessageId,
+        content: messages[0].repliedContent,
+        messageType: messages[0].repliedMessageType?.toLowerCase(),
+        senderId: messages[0].repliedSenderId,
+        senderFirstName: messages[0].repliedSenderFirstName
+      } : null,
       messageType: messages[0].messageType.toLowerCase(),
       content: messages[0].content,
       voiceDuration: messages[0].voiceDuration,

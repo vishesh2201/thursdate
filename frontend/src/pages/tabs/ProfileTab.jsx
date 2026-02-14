@@ -16,6 +16,10 @@ export default function ProfileTab() {
       setError("");
       try {
         const userData = await userAPI.getProfile();
+        console.log('[ProfileTab] Loaded user data:', userData);
+        console.log('[ProfileTab] Profile picture URL:', userData.profilePicUrl);
+        console.log('[ProfileTab] Face photos:', userData.facePhotos);
+        console.log('[ProfileTab] Using photo:', userData.profilePicUrl || userData.facePhotos?.[0] || 'none');
         setUserInfo(userData);
       } catch (err) {
         setError(err.message);

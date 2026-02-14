@@ -48,7 +48,7 @@ export const chatAPI = {
     },
 
     // Send a message in a conversation
-    sendMessage: async (conversationId, messageType, content, voiceDuration = null) => {
+    sendMessage: async (conversationId, messageType, content, voiceDuration = null, replyToMessageId = null) => {
         if (isMockMode()) {
             console.log("MOCK MODE: Simulating message send.");
             return {
@@ -57,15 +57,21 @@ export const chatAPI = {
                 messageType,
                 content,
                 voiceDuration,
+                replyToMessageId,
                 isRead: false,
                 isSent: true,
                 createdAt: new Date().toISOString(),
             };
         }
         
+        const body = { messageType, content, voiceDuration };
+        if (replyToMessageId) {
+            body.replyToMessageId = replyToMessageId;
+        }
+        
         return authRequest(`/chat/conversations/${conversationId}/messages`, {
             method: 'POST',
-            body: JSON.stringify({ messageType, content, voiceDuration }),
+            body: JSON.stringify(body),
         });
     },
 

@@ -152,9 +152,10 @@ class SocketService {
    * @param {string} messageType - Type of message ('text' or 'voice')
    * @param {string} content - Message content
    * @param {number} voiceDuration - Duration of voice message (optional)
+   * @param {number} replyToMessageId - ID of message being replied to (optional)
    * @returns {Promise} - Resolves when message is sent, rejects on error
    */
-  sendMessage(conversationId, messageType, content, voiceDuration = null) {
+  sendMessage(conversationId, messageType, content, voiceDuration = null, replyToMessageId = null) {
     return new Promise((resolve, reject) => {
       if (!this.socket || !this.socket.connected) {
         reject(new Error('Socket not connected'));
@@ -186,12 +187,17 @@ class SocketService {
       this.socket.on('message_error', errorHandler);
 
       // Emit message
-      this.socket.emit('send_message', {
+      const messageData = {
         conversationId,
         messageType,
         content,
         voiceDuration
-      });
+      };
+      if (replyToMessageId) {
+        messageData.replyToMessageId = replyToMessageId;
+      }
+      
+      this.socket.emit('send_message', messageData);
 
       // Timeout after 10 seconds
       setTimeout(() => {

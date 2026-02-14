@@ -70,7 +70,7 @@ const initializeSocketHandlers = (io) => {
     });
     
     // Handle sending messages via Socket.IO
-    socket.on('send_message', async ({ conversationId, messageType, content, voiceDuration }) => {
+    socket.on('send_message', async ({ conversationId, messageType, content, voiceDuration, replyToMessageId }) => {
       try {
         const userId = socket.userId;
         
@@ -124,9 +124,9 @@ const initializeSocketHandlers = (io) => {
         
         // Insert message into database
         const [result] = await pool.execute(
-          `INSERT INTO messages (conversation_id, sender_id, type, content, duration, status) 
-           VALUES (?, ?, ?, ?, ?, 'SENT')`,
-          [parseInt(conversationId), userId, messageType.toUpperCase(), content, voiceDuration || null]
+          `INSERT INTO messages (conversation_id, sender_id, reply_to_message_id, type, content, duration, status) 
+           VALUES (?, ?, ?, ?, ?, ?, 'SENT')`,
+          [parseInt(conversationId), userId, replyToMessageId || null, messageType.toUpperCase(), content, voiceDuration || null]
         );
         
         // Update conversation's updated_at timestamp
@@ -140,15 +140,22 @@ const initializeSocketHandlers = (io) => {
           `SELECT 
             m.id,
             m.sender_id as senderId,
+            m.reply_to_message_id as replyToMessageId,
             m.type as messageType,
             m.content,
             m.duration as voiceDuration,
             m.status,
             m.created_at as createdAt,
             u.first_name as senderFirstName,
-            u.last_name as senderLastName
+            u.last_name as senderLastName,
+            rm.content as repliedContent,
+            rm.type as repliedMessageType,
+            rm.sender_id as repliedSenderId,
+            ru.first_name as repliedSenderFirstName
           FROM messages m
           JOIN users u ON u.id = m.sender_id
+          LEFT JOIN messages rm ON rm.id = m.reply_to_message_id
+          LEFT JOIN users ru ON ru.id = rm.sender_id
           WHERE m.id = ?`,
           [result.insertId]
         );
@@ -156,6 +163,14 @@ const initializeSocketHandlers = (io) => {
         const savedMessage = {
           id: messages[0].id,
           senderId: messages[0].senderId,
+          replyToMessageId: messages[0].replyToMessageId,
+          repliedMessage: messages[0].replyToMessageId ? {
+            id: messages[0].replyToMessageId,
+            content: messages[0].repliedContent,
+            messageType: messages[0].repliedMessageType?.toLowerCase(),
+            senderId: messages[0].repliedSenderId,
+            senderFirstName: messages[0].repliedSenderFirstName
+          } : null,
           messageType: messages[0].messageType.toLowerCase(),
           content: messages[0].content,
           voiceDuration: messages[0].voiceDuration,
