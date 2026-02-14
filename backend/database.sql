@@ -14,8 +14,8 @@ CREATE TABLE users (
   gender VARCHAR(50),
   dob DATE,
   current_location VARCHAR(100),
-  favourite_travel_destination VARCHAR(100),
-  last_holiday_places TEXT,
+  favourite_travel_destination TEXT, -- ✅ SWAPPED: Now JSON array (3+ destinations)
+  last_holiday_places VARCHAR(255), -- ✅ SWAPPED: Now single string
   favourite_places_to_go TEXT,
   profile_pic_url VARCHAR(500),
   intent TEXT,

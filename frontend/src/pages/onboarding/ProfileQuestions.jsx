@@ -5,6 +5,7 @@ import {
     WheelPicker,
     WheelPickerWrapper,
 } from "@ncdai/react-wheel-picker";
+import { saveOnboardingState, loadOnboardingState, clearOnboardingState, STORAGE_KEYS } from '../../utils/onboardingPersistence';
 
 export default function ProfileQuestions() {
     const navigate = useNavigate();
@@ -46,7 +47,7 @@ export default function ProfileQuestions() {
 
     const totalSteps = 16; // Updated to include all questions + face photos
 
-    // Load existing profile data
+    // Load existing profile data and saved onboarding state
     useEffect(() => {
         let mounted = true;
         const loadProfile = async () => {
@@ -89,6 +90,36 @@ export default function ProfileQuestions() {
                     while (photos.length < 6) photos.push(null);
                     setFacePhotos(photos.slice(0, 6));
                 }
+
+                // Load saved onboarding state from localStorage (overrides profile data)
+                const savedState = loadOnboardingState(STORAGE_KEYS.PROFILE_QUESTIONS);
+                if (savedState) {
+                    console.log('[ProfileQuestions] Restoring saved onboarding state:', savedState.step);
+                    if (savedState.step) setStep(savedState.step);
+                    if (savedState.education) setEducation(savedState.education);
+                    if (savedState.educationDetail) setEducationDetail(savedState.educationDetail);
+                    if (savedState.languages) setLanguages(savedState.languages);
+                    if (savedState.canCode !== undefined) setCanCode(savedState.canCode);
+                    if (savedState.codingLanguages) setCodingLanguages(savedState.codingLanguages);
+                    if (savedState.jobTitle) setJobTitle(savedState.jobTitle);
+                    if (savedState.companyName) setCompanyName(savedState.companyName);
+                    if (savedState.pets) setPets(savedState.pets);
+                    if (savedState.foodPreference) setFoodPreference(savedState.foodPreference);
+                    if (savedState.sleepSchedule) setSleepSchedule(savedState.sleepSchedule);
+                    if (savedState.drinking) setDrinking(savedState.drinking);
+                    if (savedState.smoking) setSmoking(savedState.smoking);
+                    if (savedState.height) setHeight(savedState.height);
+                    if (savedState.dateBill) setDateBill(savedState.dateBill);
+                    if (savedState.kids) setKids(savedState.kids);
+                    if (savedState.religiousLevel) setReligiousLevel(savedState.religiousLevel);
+                    if (savedState.religion) setReligion(savedState.religion);
+                    if (savedState.customReligion) setCustomReligion(savedState.customReligion);
+                    if (savedState.favoriteCafe) setFavoriteCafe(savedState.favoriteCafe);
+                    if (savedState.relationshipValues) setRelationshipValues(savedState.relationshipValues);
+                    if (savedState.livingSituation) setLivingSituation(savedState.livingSituation);
+                    if (savedState.livingSituationCustom) setLivingSituationCustom(savedState.livingSituationCustom);
+                    if (savedState.facePhotos) setFacePhotos(savedState.facePhotos);
+                }
             } catch (err) {
                 console.error('Failed to load profile', err);
             } finally {
@@ -117,6 +148,37 @@ export default function ProfileQuestions() {
             };
         });
     }, []);
+
+    // Auto-save onboarding state to localStorage whenever key fields change
+    useEffect(() => {
+        const state = {
+            step,
+            education,
+            educationDetail,
+            languages,
+            canCode,
+            codingLanguages,
+            jobTitle,
+            companyName,
+            pets,
+            foodPreference,
+            sleepSchedule,
+            drinking,
+            smoking,
+            height,
+            dateBill,
+            kids,
+            religiousLevel,
+            religion,
+            customReligion,
+            favoriteCafe,
+            relationshipValues,
+            livingSituation,
+            livingSituationCustom,
+            facePhotos,
+        };
+        saveOnboardingState(STORAGE_KEYS.PROFILE_QUESTIONS, state);
+    }, [step, education, educationDetail, languages, canCode, codingLanguages, jobTitle, companyName, pets, foodPreference, sleepSchedule, drinking, smoking, height, dateBill, kids, religiousLevel, religion, customReligion, favoriteCafe, relationshipValues, livingSituation, livingSituationCustom, facePhotos]);
 
     const canProceed = () => {
         switch (step) {
@@ -207,6 +269,9 @@ export default function ProfileQuestions() {
                 },
                 onboardingComplete: levelOnly ? undefined : true,
             });
+            
+            // Clear saved onboarding state on successful completion
+            clearOnboardingState(STORAGE_KEYS.PROFILE_QUESTIONS);
             
             // If this is a level 2 only flow, mark it as complete and navigate back
             console.log('[ProfileQuestions] Checking level flow:', { levelOnly, returnState, returnTo });

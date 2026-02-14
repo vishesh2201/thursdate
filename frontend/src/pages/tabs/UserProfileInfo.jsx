@@ -514,20 +514,23 @@ export default function UserProfileInfo() {
                     )}
 
                     {/* Lifestyle Section */}
-                    {(user.favouriteTravelDestination || user.pets || user.height || user.foodPreference || user.intent?.profileQuestions?.sleepSchedule || user.drinking || user.smoking) && (
+                    {((user.favouriteTravelDestination && user.favouriteTravelDestination.length > 0) || user.pets || user.height || user.foodPreference || user.intent?.profileQuestions?.sleepSchedule || user.drinking || user.smoking) && (
                         <div className="mb-4">
                             <h3 className="text-white text-base font-semibold mb-3">Lifestyle</h3>
 
                             <div className="bg-white/10 rounded-xl p-3 flex flex-col gap-3">
                                 <div className="space-y-3">
-                                    {user.favouriteTravelDestination && (
+                                    {/* ✅ UPDATED: favouriteTravelDestination is now an array */}
+                                    {user.favouriteTravelDestination && user.favouriteTravelDestination.length > 0 && (
                                         <div className="flex items-start gap-3">
                                             <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center flex-shrink-0 border border-white/30">
                                                 <img src="/profileLocation.svg" alt="Favorite Destination" className="w-4 h-4" />
                                             </div>
                                             <div>
-                                                <div className="text-white/70 text-xs">Favorite Destination</div>
-                                                <div className="text-white font-medium text-sm">{user.favouriteTravelDestination}</div>
+                                                <div className="text-white/70 text-xs">Favorite Destinations</div>
+                                                <div className="text-white font-medium text-sm">
+                                                    {user.favouriteTravelDestination.map(place => place.name || place).join(', ')}
+                                                </div>
                                             </div>
                                         </div>
                                     )}

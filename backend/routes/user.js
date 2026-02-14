@@ -91,8 +91,10 @@ router.get('/profile', auth, async (req, res) => {
             currentLocation: user.current_location || null,
             city: user.city || null,
             locationPreference: user.location_preference || 'same_city',
-            favouriteTravelDestination: user.favourite_travel_destination || null,
-            lastHolidayPlaces: safeJsonParse(user.last_holiday_places, []),
+            // ✅ SWAPPED: favouriteTravelDestination is now JSON array
+            favouriteTravelDestination: safeJsonParse(user.favourite_travel_destination, []),
+            // ✅ SWAPPED: lastHolidayPlaces is now a string
+            lastHolidayPlaces: user.last_holiday_places || null,
             favouritePlacesToGo: safeJsonParse(user.favourite_places_to_go, []),
             profilePicUrl: user.profile_pic_url || null,
             faceVerificationUrl: user.face_photo_url || null,
@@ -182,8 +184,10 @@ router.get('/profile/:userId', auth, async (req, res) => {
             dob: user.dob || null,
             currentLocation: user.current_location || null,
             location: user.current_location || null,
-            favouriteTravelDestination: user.favourite_travel_destination || null,
-            lastHolidayPlaces: safeJsonParse(user.last_holiday_places, []),
+            // ✅ SWAPPED: favouriteTravelDestination is now JSON array
+            favouriteTravelDestination: safeJsonParse(user.favourite_travel_destination, []),
+            // ✅ SWAPPED: lastHolidayPlaces is now a string
+            lastHolidayPlaces: user.last_holiday_places || null,
             favouritePlacesToGo: safeJsonParse(user.favourite_places_to_go, []),
             profilePicUrl: user.profile_pic_url || null,
             intent: safeJsonParse(user.intent, {}),
@@ -269,7 +273,9 @@ router.post('/profile', auth, async (req, res) => {
         } = req.body;
         
         let formattedDob = dob ? new Date(dob).toISOString().split('T')[0] : null;
-        const lastHolidayPlacesJson = JSON.stringify(lastHolidayPlaces || []);
+        // ✅ SWAPPED: favouriteTravelDestination is now JSON array
+        const favouriteTravelDestinationJson = JSON.stringify(favouriteTravelDestination || []);
+        // ✅ SWAPPED: lastHolidayPlaces is now a string (no JSON.stringify)
         const favouritePlacesToGoJson = JSON.stringify(favouritePlacesToGo || []);
         
         // Extract city from currentLocation
@@ -290,8 +296,8 @@ router.post('/profile', auth, async (req, res) => {
                 formattedDob, 
                 currentLocation || null,
                 city,
-                favouriteTravelDestination || null, 
-                lastHolidayPlacesJson, 
+                favouriteTravelDestinationJson, // ✅ SWAPPED: Now JSON
+                lastHolidayPlaces || null, // ✅ SWAPPED: Now string
                 favouritePlacesToGoJson, 
                 profilePicUrl || null, 
                 faceVerificationUrl || null,
@@ -369,8 +375,10 @@ router.put('/profile', auth, async (req, res) => {
             currentLocation !== undefined ? currentLocation : currentUser.current_location,
             city,
             locationPreference !== undefined ? locationPreference : (currentUser.location_preference || 'same_city'),
-            favouriteTravelDestination !== undefined ? favouriteTravelDestination : currentUser.favourite_travel_destination,
-            JSON.stringify(lastHolidayPlaces !== undefined ? lastHolidayPlaces : safeJsonParse(currentUser.last_holiday_places, [])),
+            // ✅ SWAPPED: favouriteTravelDestination is now JSON array
+            JSON.stringify(favouriteTravelDestination !== undefined ? favouriteTravelDestination : safeJsonParse(currentUser.favourite_travel_destination, [])),
+            // ✅ SWAPPED: lastHolidayPlaces is now a string
+            lastHolidayPlaces !== undefined ? lastHolidayPlaces : (currentUser.last_holiday_places || null),
             JSON.stringify(favouritePlacesToGo !== undefined ? favouritePlacesToGo : safeJsonParse(currentUser.favourite_places_to_go, [])),
             profilePicUrl !== undefined ? profilePicUrl : currentUser.profile_pic_url,
             intentJson,

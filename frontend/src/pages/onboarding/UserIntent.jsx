@@ -2,6 +2,7 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { userAPI, uploadAPI } from '../../utils/api';
+import { saveOnboardingState, loadOnboardingState, clearOnboardingState, STORAGE_KEYS } from '../../utils/onboardingPersistence';
 
 export default function UserIntent() {
   const navigate = useNavigate();
@@ -47,7 +48,7 @@ export default function UserIntent() {
   const minAge = 35;
   const maxAge = 85;
 
-  // Load existing profile
+  // Load existing profile and saved onboarding state
   useEffect(() => {
     let mounted = true;
     const load = async () => {
@@ -72,6 +73,25 @@ export default function UserIntent() {
             setArtistsBands(userData.intent.artistsBands || []);
             setLifestyleImageUrls(userData.intent.lifestyleImageUrls || [null, null, null, null, null]);
           }
+        }
+
+        // Load saved onboarding state from localStorage (overrides profile data)
+        const savedState = loadOnboardingState(STORAGE_KEYS.USER_INTENT);
+        if (savedState) {
+          console.log('[UserIntent] Restoring saved onboarding state:', savedState.step);
+          if (savedState.step) setStep(savedState.step);
+          if (savedState.purpose) setPurpose(savedState.purpose);
+          if (savedState.relationshipVibe) setRelationshipVibe(savedState.relationshipVibe);
+          if (savedState.interestedGender) setInterestedGender(savedState.interestedGender);
+          if (savedState.ageRange) setAgeRange(savedState.ageRange);
+          if (savedState.bio) setBio(savedState.bio);
+          if (savedState.interests) setInterests(savedState.interests);
+          if (savedState.tvShows) setTvShows(savedState.tvShows);
+          if (savedState.movies) setMovies(savedState.movies);
+          if (savedState.watchList) setWatchList(savedState.watchList);
+          if (savedState.artistsBands) setArtistsBands(savedState.artistsBands);
+          if (savedState.profileImageUrl) setProfileImageUrl(savedState.profileImageUrl);
+          if (savedState.lifestyleImageUrls) setLifestyleImageUrls(savedState.lifestyleImageUrls);
         }
       } catch (err) {
         console.error('Failed to load profile', err);
@@ -149,6 +169,26 @@ export default function UserIntent() {
     if (!sttSupported) return;
     if (listening) stopListening(); else startListening();
   };
+
+  // Auto-save onboarding state to localStorage whenever key fields change
+  useEffect(() => {
+    const state = {
+      step,
+      purpose,
+      relationshipVibe,
+      interestedGender,
+      ageRange,
+      bio,
+      interests,
+      tvShows,
+      movies,
+      watchList,
+      artistsBands,
+      profileImageUrl,
+      lifestyleImageUrls,
+    };
+    saveOnboardingState(STORAGE_KEYS.USER_INTENT, state);
+  }, [step, purpose, relationshipVibe, interestedGender, ageRange, bio, interests, tvShows, movies, watchList, artistsBands, profileImageUrl, lifestyleImageUrls]);
 
   useEffect(() => {
     if (bioMode !== 'Listen' && listening) {
@@ -328,6 +368,8 @@ export default function UserIntent() {
         profileImageUrl,
         onboardingComplete: true, // ✅ Onboarding complete - navigate to Home
       });
+      // Clear saved onboarding state on successful completion
+      clearOnboardingState(STORAGE_KEYS.USER_INTENT);
       navigate('/');
     } catch (err) {
       console.error('Save failed', err);

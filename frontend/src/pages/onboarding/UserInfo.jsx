@@ -6,6 +6,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import backgroundImage from '/bgs/bg-1.png'; // Adjust path if the image is in a different folder (e.g., '../assets/image_dd0111.jpg')
 import { authAPI, userAPI, uploadAPI } from '../../utils/api';
+import { saveOnboardingState, loadOnboardingState, clearOnboardingState, STORAGE_KEYS } from '../../utils/onboardingPersistence';
 
 // Helper to get days in a month (handles leap years)
 const getDaysInMonth = (year, month) => {
@@ -103,14 +104,16 @@ export default function UserInfo() {
   const [currentLocation, setCurrentLocation] = useState("");
   const [currentLocationSuggestions, setCurrentLocationSuggestions] = useState([]);
   const [loadingCurrentLocation, setLoadingCurrentLocation] = useState(false);
-  const [favouriteTravelDestination, setFavouriteTravelDestination] = useState("");
+  // ✅ SWAPPED: favouriteTravelDestination is now an array (3+ items)
+  const [favouriteTravelDestination, setFavouriteTravelDestination] = useState([]);
+  const [currentFavouriteDestinationInput, setCurrentFavouriteDestinationInput] = useState("");
   const [favouriteDestinationSuggestions, setFavouriteDestinationSuggestions] = useState([]);
-  const [loadingFavouriteDestination, setLoadingFavouriteDestination] = useState(false);
 
   // States for tag-based inputs
-  const [lastHolidayPlaces, setLastHolidayPlaces] = useState([]);
-  const [currentLastHolidayPlaceInput, setCurrentLastHolidayPlaceInput] = useState("");
+  // ✅ SWAPPED: lastHolidayPlaces is now a single string
+  const [lastHolidayPlaces, setLastHolidayPlaces] = useState("");
   const [lastHolidaySuggestions, setLastHolidaySuggestions] = useState([]);
+  const [loadingLastHoliday, setLoadingLastHoliday] = useState(false);
   const [favouritePlacesToGo, setFavouritePlacesToGo] = useState([]);
   const [currentFavouritePlaceToGoInput, setCurrentFavouritePlaceToGoInput] = useState("");
   const [favouritePlaceSuggestions, setFavouritePlaceSuggestions] = useState([]);
@@ -124,7 +127,7 @@ export default function UserInfo() {
 
   const navigate = useNavigate();
 
-  // Load existing profile data
+  // Load existing profile data and saved onboarding state
   useEffect(() => {
     let mounted = true;
     const loadProfile = async () => {
@@ -144,10 +147,30 @@ export default function UserInfo() {
         }
         if (userData.dob) setDob(userData.dob);
         if (userData.currentLocation) setCurrentLocation(userData.currentLocation);
+        // ✅ SWAPPED: favouriteTravelDestination is now an array
         if (userData.favouriteTravelDestination) setFavouriteTravelDestination(userData.favouriteTravelDestination);
+        // ✅ SWAPPED: lastHolidayPlaces is now a string
         if (userData.lastHolidayPlaces) setLastHolidayPlaces(userData.lastHolidayPlaces);
         if (userData.favouritePlacesToGo) setFavouritePlacesToGo(userData.favouritePlacesToGo);
         if (userData.faceVerificationUrl) setFaceVerificationUrl(userData.faceVerificationUrl);
+
+        // Load saved onboarding state from localStorage (overrides profile data)
+        const savedState = loadOnboardingState(STORAGE_KEYS.USER_INFO);
+        if (savedState) {
+          console.log('[UserInfo] Restoring saved onboarding state:', savedState.step);
+          if (savedState.step) setStep(savedState.step);
+          if (savedState.firstName) setFirstName(savedState.firstName);
+          if (savedState.lastName) setLastName(savedState.lastName);
+          if (savedState.gender) setGender(savedState.gender);
+          if (savedState.customGender) setCustomGender(savedState.customGender);
+          if (savedState.dob) setDob(savedState.dob);
+          if (savedState.currentLocation) setCurrentLocation(savedState.currentLocation);
+          // ✅ SWAPPED: Load array/string correctly
+          if (savedState.favouriteTravelDestination) setFavouriteTravelDestination(savedState.favouriteTravelDestination);
+          if (savedState.lastHolidayPlaces) setLastHolidayPlaces(savedState.lastHolidayPlaces);
+          if (savedState.favouritePlacesToGo) setFavouritePlacesToGo(savedState.favouritePlacesToGo);
+          if (savedState.faceVerificationUrl) setFaceVerificationUrl(savedState.faceVerificationUrl);
+        }
       } catch (err) {
         console.error('Failed to load profile', err);
       }
@@ -166,8 +189,10 @@ export default function UserInfo() {
 
   // Debounced values for API calls
   const debouncedCurrentLocation = useDebounce(currentLocation, 500);
-  const debouncedFavouriteDestination = useDebounce(favouriteTravelDestination, 500);
-  const debouncedLastHolidayInput = useDebounce(currentLastHolidayPlaceInput, 500);
+  // ✅ SWAPPED: Now debounce the input field for favouriteTravelDestination array
+  const debouncedFavouriteDestinationInput = useDebounce(currentFavouriteDestinationInput, 500);
+  // ✅ SWAPPED: Now debounce lastHolidayPlaces single string
+  const debouncedLastHoliday = useDebounce(lastHolidayPlaces, 500);
   const debouncedFavouritePlaceInput = useDebounce(currentFavouritePlaceToGoInput, 500);
 
   // Effect for current location autocomplete
@@ -183,29 +208,29 @@ export default function UserInfo() {
     });
   }, [debouncedCurrentLocation]);
 
-  // Effect for favourite destination autocomplete
+  // ✅ SWAPPED: Effect for favourite destination autocomplete (now for array input)
   useEffect(() => {
-    if (!debouncedFavouriteDestination || debouncedFavouriteDestination.length < 2) {
+    if (!debouncedFavouriteDestinationInput || debouncedFavouriteDestinationInput.length < 2) {
       setFavouriteDestinationSuggestions([]);
       return;
     }
-    setLoadingFavouriteDestination(true);
-    fetchLocationSuggestions(debouncedFavouriteDestination).then(suggestions => {
-      setFavouriteDestinationSuggestions(suggestions);
-      setLoadingFavouriteDestination(false);
+    fetchLocationSuggestions(debouncedFavouriteDestinationInput).then(suggestions => {
+      setFavouriteDestinationSuggestions(suggestions.map(s => s.name));
     });
-  }, [debouncedFavouriteDestination]);
+  }, [debouncedFavouriteDestinationInput]);
 
-  // Effect for autocomplete suggestions for Last Holiday Places
+  // ✅ SWAPPED: Effect for autocomplete suggestions for Last Holiday (now single string)
   useEffect(() => {
-    if (!debouncedLastHolidayInput || debouncedLastHolidayInput.length < 2) {
+    if (!debouncedLastHoliday || debouncedLastHoliday.length < 2) {
       setLastHolidaySuggestions([]);
       return;
     }
-    fetchLocationSuggestions(debouncedLastHolidayInput).then(suggestions => {
-      setLastHolidaySuggestions(suggestions.map(s => s.name));
+    setLoadingLastHoliday(true);
+    fetchLocationSuggestions(debouncedLastHoliday).then(suggestions => {
+      setLastHolidaySuggestions(suggestions);
+      setLoadingLastHoliday(false);
     });
-  }, [debouncedLastHolidayInput]);
+  }, [debouncedLastHoliday]);
 
   // Effect for autocomplete suggestions for Favourite Places to Go
   useEffect(() => {
@@ -217,6 +242,24 @@ export default function UserInfo() {
       setFavouritePlaceSuggestions(suggestions.map(s => s.name));
     });
   }, [debouncedFavouritePlaceInput]);
+
+  // Auto-save onboarding state to localStorage whenever key fields change
+  useEffect(() => {
+    const state = {
+      step,
+      firstName,
+      lastName,
+      gender,
+      customGender,
+      dob,
+      currentLocation,
+      favouriteTravelDestination,
+      lastHolidayPlaces,
+      favouritePlacesToGo,
+      faceVerificationUrl,
+    };
+    saveOnboardingState(STORAGE_KEYS.USER_INFO, state);
+  }, [step, firstName, lastName, gender, customGender, dob, currentLocation, favouriteTravelDestination, lastHolidayPlaces, favouritePlacesToGo, faceVerificationUrl]);
 
   // Adjust pickerDay if month/year changes and the day becomes invalid
   const updatePickerDayBasedOnMonthYear = useCallback((year, month, day) => {
@@ -246,6 +289,8 @@ export default function UserInfo() {
           favouritePlacesToGo,
           faceVerificationUrl, // Stored for later face matching verification
         });
+        // Clear saved onboarding state on successful completion
+        clearOnboardingState(STORAGE_KEYS.USER_INFO);
         navigate('/social-presence');
       } catch (err) {
         alert("Failed to save user info: " + err.message);
@@ -311,23 +356,23 @@ export default function UserInfo() {
     return { name: input.trim(), details: "" };
   };
 
-  // Handlers for Last Holiday Places (Step 6)
-  const handleAddLastHolidayPlace = (e) => {
-    if (e.key === 'Enter' && currentLastHolidayPlaceInput.trim() !== '') {
-      const { name, details } = parsePlaceInput(currentLastHolidayPlaceInput);
-      setLastHolidayPlaces(prev => [...prev, { id: Date.now(), name, details }]);
-      setCurrentLastHolidayPlaceInput("");
-      setLastHolidaySuggestions([]);
+  // ✅ SWAPPED: Handlers for Favourite Travel Destination (Step 5) - Now array with 3+ items
+  const handleAddFavouriteDestination = (e) => {
+    if (e.key === 'Enter' && currentFavouriteDestinationInput.trim() !== '') {
+      const { name, details } = parsePlaceInput(currentFavouriteDestinationInput);
+      setFavouriteTravelDestination(prev => [...prev, { id: Date.now(), name, details }]);
+      setCurrentFavouriteDestinationInput("");
+      setFavouriteDestinationSuggestions([]);
     }
   };
 
-  const handleRemoveLastHolidayPlace = (id) => {
-    setLastHolidayPlaces(prev => prev.filter(place => place.id !== id));
+  const handleRemoveFavouriteDestination = (id) => {
+    setFavouriteTravelDestination(prev => prev.filter(place => place.id !== id));
   };
 
-  const handleLastHolidaySuggestionClick = (suggestion) => {
-    setCurrentLastHolidayPlaceInput(suggestion);
-    setLastHolidaySuggestions([]);
+  const handleFavouriteDestinationSuggestionClick = (suggestion) => {
+    setCurrentFavouriteDestinationInput(suggestion);
+    setFavouriteDestinationSuggestions([]);
   };
 
   // Handlers for Favourite Places to Go (Step 7)
@@ -364,8 +409,10 @@ export default function UserInfo() {
     return age >= 30;
   }, [dob]);
   const isStepFourValid = currentLocation.trim();
-  const isStepFiveValid = favouriteTravelDestination.trim();
-  const isStepSixValid = lastHolidayPlaces.length >= 3;
+  // ✅ SWAPPED: favouriteTravelDestination now needs 3+ items
+  const isStepFiveValid = favouriteTravelDestination.length >= 3;
+  // ✅ SWAPPED: lastHolidayPlaces now needs to be a non-empty string
+  const isStepSixValid = lastHolidayPlaces.trim();
   const isStepSevenValid = favouritePlacesToGo.length >= 3;
   const isStepEightValid = !!faceVerificationUrl;
 
@@ -720,29 +767,28 @@ export default function UserInfo() {
             </div>
           )}
 
-          {/* Step 5: Favourite Travel Destination */}
+          {/* Step 5: Favourite Travel Destination - ✅ SWAPPED: Now tag input with 3+ items */}
           {step === 5 && (
             <div className="flex flex-col flex-grow">
-              <h1 className="text-xl font-semibold mb-4 text-white drop-shadow-md">What is your favourite travel destination?</h1>
-              <p className="text-sm text-white/70 mb-6">Enter your dream destination</p>
-              <div className="relative mb-auto">
+              <h1 className="text-xl font-semibold mb-4 text-white drop-shadow-md">What are your three favourite travel destinations?</h1>
+              <p className={`text-sm mb-6 ${isStepFiveValid ? 'text-white/70' : 'text-red-300'}`}>
+                {isStepFiveValid ? 'Great! You can add more if you like.' : 'Enter minimum 3 destinations'}
+              </p>
+
+              {/* Input for new tags with autocomplete - MOVED TO TOP */}
+              <div className="relative mb-4">
                 <input
                   type="text"
-                  value={favouriteTravelDestination}
-                  onChange={(e) => setFavouriteTravelDestination(e.target.value)}
-                  placeholder="Start typing... (e.g., Paris, France)"
+                  value={currentFavouriteDestinationInput}
+                  onChange={(e) => setCurrentFavouriteDestinationInput(e.target.value)}
+                  onKeyDown={handleAddFavouriteDestination}
+                  placeholder="Type a destination & press Enter (e.g., Paris, France)"
                   className={`w-full px-4 py-3 border rounded-xl text-sm pr-10 ${INPUT_GLASS}`}
-                  autoComplete="off"
                 />
-                {loadingFavouriteDestination && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                  </div>
-                )}
-                {favouriteTravelDestination && !loadingFavouriteDestination && (
+                {currentFavouriteDestinationInput && (
                   <button
                     onClick={() => {
-                      setFavouriteTravelDestination("");
+                      setCurrentFavouriteDestinationInput("");
                       setFavouriteDestinationSuggestions([]);
                     }}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 text-lg transition"
@@ -751,69 +797,11 @@ export default function UserInfo() {
                   </button>
                 )}
                 {favouriteDestinationSuggestions.length > 0 && (
-                  <ul className="absolute z-20 w-full bg-white/40 backdrop-blur-lg border border-white/40 rounded-xl mt-1 max-h-60 overflow-y-auto shadow-xl">
+                  <ul className="absolute z-20 w-full bg-white/40 backdrop-blur-lg border border-white/40 rounded-xl mt-1 max-h-40 overflow-y-auto shadow-xl">
                     {favouriteDestinationSuggestions.map((suggestion, index) => (
                       <li
                         key={index}
-                        onClick={() => {
-                          setFavouriteTravelDestination(suggestion.city ? `${suggestion.city}, ${suggestion.country}` : suggestion.name);
-                          setFavouriteDestinationSuggestions([]);
-                        }}
-                        className="px-4 py-3 text-sm text-white hover:bg-white/20 cursor-pointer transition border-b border-white/10 last:border-b-0"
-                      >
-                        <div className="font-medium">{suggestion.city || suggestion.name.split(',')[0]}</div>
-                        <div className="text-xs text-white/70 truncate">{suggestion.name}</div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-              <button
-                disabled={getNextButtonDisabled()}
-                onClick={handleNext}
-                className={`w-full py-4 rounded-[9999px] font-medium text-lg transition ${getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
-                  }`}
-              >
-                {getNextButtonText()}
-              </button>
-            </div>
-          )}
-
-          {/* Step 6: Last Holiday Places - Tag Input with Autocomplete */}
-          {step === 6 && (
-            <div className="flex flex-col flex-grow">
-              <h1 className="text-xl font-semibold mb-4 text-white drop-shadow-md">Where did you go on your last holiday?</h1>
-              <p className={`text-sm mb-6 ${isStepSixValid ? 'text-white/70' : 'text-red-300'}`}>
-                {isStepSixValid ? 'Great! You can add more if you like.' : 'Enter minimum 3 places'}
-              </p>
-
-              {/* Input for new tags with autocomplete - MOVED TO TOP */}
-              <div className="relative mb-4">
-                <input
-                  type="text"
-                  value={currentLastHolidayPlaceInput}
-                  onChange={(e) => setCurrentLastHolidayPlaceInput(e.target.value)}
-                  onKeyDown={handleAddLastHolidayPlace}
-                  placeholder="Type a place & press Enter (e.g., Paris)"
-                  className={`w-full px-4 py-3 border rounded-xl text-sm pr-10 ${INPUT_GLASS}`}
-                />
-                {currentLastHolidayPlaceInput && (
-                  <button
-                    onClick={() => {
-                      setCurrentLastHolidayPlaceInput("");
-                      setLastHolidaySuggestions([]);
-                    }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 text-lg transition"
-                  >
-                    ×
-                  </button>
-                )}
-                {lastHolidaySuggestions.length > 0 && (
-                  <ul className="absolute z-20 w-full bg-white/40 backdrop-blur-lg border border-white/40 rounded-xl mt-1 max-h-40 overflow-y-auto shadow-xl">
-                    {lastHolidaySuggestions.map((suggestion, index) => (
-                      <li
-                        key={index}
-                        onClick={() => handleLastHolidaySuggestionClick(suggestion)}
+                        onClick={() => handleFavouriteDestinationSuggestionClick(suggestion)}
                         className="px-4 py-2 text-sm text-white hover:bg-white/20 cursor-pointer transition"
                       >
                         {suggestion}
@@ -825,7 +813,7 @@ export default function UserInfo() {
 
               {/* Display existing tags - MOVED BELOW INPUT */}
               <div className="flex flex-wrap gap-4 mb-auto max-h-40 overflow-y-auto">
-                {lastHolidayPlaces.map((place) => (
+                {favouriteTravelDestination.map((place) => (
                   <div
                     key={place.id}
                     className="px-3 py-2 rounded-full flex items-center justify-between text-sm shadow-md"
@@ -843,7 +831,7 @@ export default function UserInfo() {
                       )}
                     </div>
                     <button
-                      onClick={() => handleRemoveLastHolidayPlace(place.id)}
+                      onClick={() => handleRemoveFavouriteDestination(place.id)}
                       className="ml-2 text-white/80 hover:text-white transition flex-shrink-0"
                     >
                       ×
@@ -856,6 +844,65 @@ export default function UserInfo() {
                 disabled={getNextButtonDisabled()}
                 onClick={handleNext}
                 className={`w-full py-4 rounded-[9999px] font-medium text-lg transition mt-6 ${getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
+                  }`}
+              >
+                {getNextButtonText()}
+              </button>
+            </div>
+          )}
+
+          {/* Step 6: Last Holiday Place - ✅ SWAPPED: Now single input string */}
+          {step === 6 && (
+            <div className="flex flex-col flex-grow">
+              <h1 className="text-xl font-semibold mb-4 text-white drop-shadow-md">Where did you go on your last holiday?</h1>
+              <p className="text-sm text-white/70 mb-6">Enter your most recent holiday destination</p>
+              <div className="relative mb-auto">
+                <input
+                  type="text"
+                  value={lastHolidayPlaces}
+                  onChange={(e) => setLastHolidayPlaces(e.target.value)}
+                  placeholder="Start typing... (e.g., Bali, Indonesia)"
+                  className={`w-full px-4 py-3 border rounded-xl text-sm pr-10 ${INPUT_GLASS}`}
+                  autoComplete="off"
+                />
+                {loadingLastHoliday && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                  </div>
+                )}
+                {lastHolidayPlaces && !loadingLastHoliday && (
+                  <button
+                    onClick={() => {
+                      setLastHolidayPlaces("");
+                      setLastHolidaySuggestions([]);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 text-lg transition"
+                  >
+                    ×
+                  </button>
+                )}
+                {lastHolidaySuggestions.length > 0 && (
+                  <ul className="absolute z-20 w-full bg-white/40 backdrop-blur-lg border border-white/40 rounded-xl mt-1 max-h-60 overflow-y-auto shadow-xl">
+                    {lastHolidaySuggestions.map((suggestion, index) => (
+                      <li
+                        key={index}
+                        onClick={() => {
+                          setLastHolidayPlaces(suggestion.city ? `${suggestion.city}, ${suggestion.country}` : suggestion.name);
+                          setLastHolidaySuggestions([]);
+                        }}
+                        className="px-4 py-3 text-sm text-white hover:bg-white/20 cursor-pointer transition border-b border-white/10 last:border-b-0"
+                      >
+                        <div className="font-medium">{suggestion.city || suggestion.name.split(',')[0]}</div>
+                        <div className="text-xs text-white/70 truncate">{suggestion.name}</div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <button
+                disabled={getNextButtonDisabled()}
+                onClick={handleNext}
+                className={`w-full py-4 rounded-[9999px] font-medium text-lg transition ${getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
                   }`}
               >
                 {getNextButtonText()}
