@@ -40,6 +40,13 @@ const extractCity = (locationString) => {
         .replace(/\s+Area$/i, '')
         .trim();
     
+    // Capitalize first letter of each word for consistency
+    cityName = cityName
+        .toLowerCase()
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    
     return cityName;
 };
 
@@ -542,22 +549,38 @@ router.get('/matches/potential', auth, async (req, res) => {
 
         // Build location clause based on user preference
         let locationClause = '';
-        if (locationPreference === 'same_city' && userCity) {
-            locationClause = ' AND city = ?';
-            queryParams.push(userCity);
-            console.log('[DEBUG] Filtering by same city:', userCity);
-        } else if (locationPreference === 'nearby_cities' && userCity) {
-            // For nearby cities, we'll match same city for now
-            // In future, you could add a cities mapping table for nearby cities
-            locationClause = ' AND city = ?';
-            queryParams.push(userCity);
-            console.log('[DEBUG] Filtering by nearby cities (currently same city):', userCity);
+        if (locationPreference === 'same_city') {
+            if (userCity) {
+                locationClause = ' AND city = ?';
+                queryParams.push(userCity);
+                console.log('[DEBUG] Filtering by same city:', userCity);
+            } else {
+                console.warn('[WARNING] User selected same_city but user.city is null/empty. Skipping location filter.');
+                // Don't filter by location if user's city is not set
+                // Alternative: return empty results to indicate profile is incomplete
+                // return res.json({ candidates: [] }); // Uncomment to require city be set
+            }
+        } else if (locationPreference === 'nearby_cities') {
+            if (userCity) {
+                // TODO: Implement nearby cities logic with a cities mapping table
+                // For now, match same city + common nearby variants
+                locationClause = ' AND (city = ? OR city LIKE ?)';
+                queryParams.push(userCity, `${userCity}%`);
+                console.log('[DEBUG] Filtering by nearby cities:', userCity);
+            } else {
+                console.warn('[WARNING] User selected nearby_cities but user.city is null/empty. Skipping location filter.');
+            }
         } else {
-            console.log('[DEBUG] No location filtering (showing anywhere)');
+            console.log('[DEBUG] No location filtering (anywhere) - preference:', locationPreference);
         }
 
         // Get potential matches using dob BETWEEN (no YEAR function, no ORDER BY RAND)
         // Exclude blocked users (both users who blocked current user and users blocked by current user)
+        // If filtering by location, also ensure candidate has a city set
+        const cityRequirementClause = (locationPreference === 'same_city' || locationPreference === 'nearby_cities') 
+            ? ' AND city IS NOT NULL AND city != \'\'' 
+            : '';
+        
         const [users] = await pool.execute(
             `SELECT id, email, first_name, last_name, gender, dob, current_location, city,
                     favourite_travel_destination, profile_pic_url, intent, 
@@ -573,6 +596,7 @@ router.get('/matches/potential', auth, async (req, res) => {
                 AND dob BETWEEN ? AND ?
                 ${genderClause}
                 ${locationClause}
+                ${cityRequirementClause}
                 AND NOT EXISTS (
                   SELECT 1 FROM blocks b 
                   WHERE (b.blocker_id = ? AND b.blocked_id = users.id)
@@ -582,7 +606,13 @@ router.get('/matches/potential', auth, async (req, res) => {
             [...queryParams, userId, userId]
         );
 
-        console.log('[DEBUG] Found users:', users.length, users.length > 0 ? users.map(u => ({ id: u.id, gender: u.gender, firstName: u.first_name })) : 'No users found');
+        console.log('[DEBUG] Found users:', users.length, users.length > 0 ? users.map(u => ({ 
+            id: u.id, 
+            gender: u.gender, 
+            firstName: u.first_name,
+            city: u.city,
+            location: u.current_location 
+        })) : 'No users found');
 
         // Parse JSON fields and calculate exact age
         const candidates = users
