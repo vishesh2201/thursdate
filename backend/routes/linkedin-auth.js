@@ -14,7 +14,7 @@ router.get('/linkedin', (req, res) => {
     const params = new URLSearchParams({
         response_type: 'code',
         client_id: process.env.LINKEDIN_CLIENT_ID,
-        redirect_uri: process.env.LINKEDIN_CALLBACK_URL || 'http://localhost:5000/auth/linkedin/callback',
+        redirect_uri: process.env.LINKEDIN_CALLBACK_URL,
         scope: 'openid profile email'
     });
     
@@ -24,14 +24,15 @@ router.get('/linkedin', (req, res) => {
 // OAuth callback handler
 router.get('/linkedin/callback', async (req, res) => {
     const { code, error } = req.query;
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     
     if (error) {
         console.error('LinkedIn OAuth error:', error);
-        return res.redirect('http://localhost:5173/social-presence?error=linkedin_auth_failed');
+        return res.redirect(`${frontendUrl}/social-presence?error=linkedin_auth_failed`);
     }
     
     if (!code) {
-        return res.redirect('http://localhost:5173/social-presence?error=linkedin_no_code');
+        return res.redirect(`${frontendUrl}/social-presence?error=linkedin_no_code`);
     }
     
     try {
@@ -42,7 +43,7 @@ router.get('/linkedin/callback', async (req, res) => {
                 code: code,
                 client_id: process.env.LINKEDIN_CLIENT_ID,
                 client_secret: process.env.LINKEDIN_CLIENT_SECRET,
-                redirect_uri: process.env.LINKEDIN_CALLBACK_URL || 'http://localhost:5000/auth/linkedin/callback'
+                redirect_uri: process.env.LINKEDIN_CALLBACK_URL
             },
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
@@ -102,10 +103,10 @@ router.get('/linkedin/callback', async (req, res) => {
         );
         
         // Redirect back to frontend with success
-        res.redirect(`http://localhost:5173/social-presence?linkedin_verified=true&token=${token}&linkedin_url=${encodeURIComponent(profileUrl)}`);
+        res.redirect(`${frontendUrl}/social-presence?linkedin_verified=true&token=${token}&linkedin_url=${encodeURIComponent(profileUrl)}`);
     } catch (error) {
         console.error('LinkedIn callback error:', error.response?.data || error.message);
-        res.redirect('http://localhost:5173/social-presence?error=linkedin_callback_failed');
+        res.redirect(`${frontendUrl}/social-presence?error=linkedin_callback_failed`);
     }
 });
 

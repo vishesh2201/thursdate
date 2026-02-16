@@ -77,8 +77,9 @@ export default function SocialPresence() {
     // Removed email OTP handlers
 
     const handleLinkedInOAuth = () => {
-        // Redirect to backend OAuth endpoint
-        window.location.href = 'http://localhost:5000/auth/linkedin';
+        // Redirect to backend OAuth endpoint (uses env variable for production)
+        const backendUrl = import.meta.env.VITE_BACKEND_API_URL.replace('/api', '');
+        window.location.href = `${backendUrl}/auth/linkedin`;
     };
 
     const handleStartVerification = () => {
