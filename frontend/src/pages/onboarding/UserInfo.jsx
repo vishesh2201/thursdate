@@ -132,13 +132,43 @@ export default function UserInfo() {
   useEffect(() => {
     let mounted = true;
     const loadProfile = async () => {
+      // ✅ FIX: Load localStorage FIRST, before API call
+      // This ensures saved state is restored even if API fails
+      const savedState = loadOnboardingState(STORAGE_KEYS.USER_INFO);
+      if (savedState) {
+        console.log('[UserInfo] Restoring saved onboarding state:', {
+          step: savedState.step,
+          firstName: savedState.firstName,
+          lastName: savedState.lastName,
+          gender: savedState.gender,
+          currentLocation: savedState.currentLocation,
+          fromLocation: savedState.fromLocation,
+          travelDestCount: savedState.favouriteTravelDestination?.length || 0
+        });
+        if (savedState.step) setStep(savedState.step);
+        if (savedState.firstName) setFirstName(savedState.firstName);
+        if (savedState.lastName) setLastName(savedState.lastName);
+        if (savedState.gender) setGender(savedState.gender);
+        if (savedState.customGender) setCustomGender(savedState.customGender);
+        if (savedState.dob) setDob(savedState.dob);
+        if (savedState.currentLocation) setCurrentLocation(savedState.currentLocation);
+        if (savedState.fromLocation) setFromLocation(savedState.fromLocation);
+        if (savedState.favouriteTravelDestination) setFavouriteTravelDestination(savedState.favouriteTravelDestination);
+        if (savedState.lastHolidayPlaces) setLastHolidayPlaces(savedState.lastHolidayPlaces);
+        if (savedState.faceVerificationUrl) setFaceVerificationUrl(savedState.faceVerificationUrl);
+      } else {
+        console.log('[UserInfo] No saved state found in localStorage');
+      }
+
+      // Then try to load from backend (but don't let it fail the whole component)
       try {
         const userData = await userAPI.getProfile();
         if (!mounted) return;
 
-        if (userData.firstName) setFirstName(userData.firstName);
-        if (userData.lastName) setLastName(userData.lastName);
-        if (userData.gender) {
+        // Only set backend data if localStorage didn't have it
+        if (userData.firstName && !savedState?.firstName) setFirstName(userData.firstName);
+        if (userData.lastName && !savedState?.lastName) setLastName(userData.lastName);
+        if (userData.gender && !savedState?.gender) {
           if (['Male', 'Female', 'Non-binary'].includes(userData.gender)) {
             setGender(userData.gender);
           } else {
@@ -146,44 +176,14 @@ export default function UserInfo() {
             setCustomGender(userData.gender);
           }
         }
-        if (userData.dob) setDob(userData.dob);
-        if (userData.currentLocation) setCurrentLocation(userData.currentLocation);
-        if (userData.fromLocation) setFromLocation(userData.fromLocation);
-        // ✅ SWAPPED: favouriteTravelDestination is now an array
-        if (userData.favouriteTravelDestination) setFavouriteTravelDestination(userData.favouriteTravelDestination);
-        // ✅ SWAPPED: lastHolidayPlaces is now a string
-        if (userData.lastHolidayPlaces) setLastHolidayPlaces(userData.lastHolidayPlaces);
-        if (userData.faceVerificationUrl) setFaceVerificationUrl(userData.faceVerificationUrl);
-
-        // Load saved onboarding state from localStorage (overrides profile data)
-        const savedState = loadOnboardingState(STORAGE_KEYS.USER_INFO);
-        if (savedState) {
-          console.log('[UserInfo] Restoring saved onboarding state:', {
-            step: savedState.step,
-            firstName: savedState.firstName,
-            lastName: savedState.lastName,
-            gender: savedState.gender,
-            currentLocation: savedState.currentLocation,
-            fromLocation: savedState.fromLocation,
-            travelDestCount: savedState.favouriteTravelDestination?.length || 0
-          });
-          if (savedState.step) setStep(savedState.step);
-          if (savedState.firstName) setFirstName(savedState.firstName);
-          if (savedState.lastName) setLastName(savedState.lastName);
-          if (savedState.gender) setGender(savedState.gender);
-          if (savedState.customGender) setCustomGender(savedState.customGender);
-          if (savedState.dob) setDob(savedState.dob);
-          if (savedState.currentLocation) setCurrentLocation(savedState.currentLocation);
-          if (savedState.fromLocation) setFromLocation(savedState.fromLocation);
-          // ✅ SWAPPED: Load array/string correctly
-          if (savedState.favouriteTravelDestination) setFavouriteTravelDestination(savedState.favouriteTravelDestination);
-          if (savedState.lastHolidayPlaces) setLastHolidayPlaces(savedState.lastHolidayPlaces);
-          if (savedState.faceVerificationUrl) setFaceVerificationUrl(savedState.faceVerificationUrl);
-        } else {
-          console.log('[UserInfo] No saved state found in localStorage');
-        }
+        if (userData.dob && !savedState?.dob) setDob(userData.dob);
+        if (userData.currentLocation && !savedState?.currentLocation) setCurrentLocation(userData.currentLocation);
+        if (userData.fromLocation && !savedState?.fromLocation) setFromLocation(userData.fromLocation);
+        if (userData.favouriteTravelDestination && !savedState?.favouriteTravelDestination) setFavouriteTravelDestination(userData.favouriteTravelDestination);
+        if (userData.lastHolidayPlaces && !savedState?.lastHolidayPlaces) setLastHolidayPlaces(userData.lastHolidayPlaces);
+        if (userData.faceVerificationUrl && !savedState?.faceVerificationUrl) setFaceVerificationUrl(userData.faceVerificationUrl);
       } catch (err) {
-        console.error('Failed to load profile', err);
+        console.error('[UserInfo] Failed to load profile from backend (continuing with localStorage):', err);
       } finally {
         if (mounted) {
           console.log('[UserInfo] Initial loading complete, enabling auto-save');
