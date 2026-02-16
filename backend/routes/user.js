@@ -268,7 +268,7 @@ router.post('/profile', auth, async (req, res) => {
         }
 
         const {
-            firstName, lastName, gender, dob, currentLocation, favouriteTravelDestination,
+            firstName, lastName, gender, dob, currentLocation, fromLocation, favouriteTravelDestination,
             lastHolidayPlaces, favouritePlacesToGo, profilePicUrl, faceVerificationUrl
         } = req.body;
         
@@ -285,7 +285,7 @@ router.post('/profile', auth, async (req, res) => {
             // 🛑 is_private REMOVED from UPDATE query
             `UPDATE users SET 
                 first_name = ?, last_name = ?, gender = ?, dob = ?, 
-                current_location = ?, city = ?, favourite_travel_destination = ?, 
+                current_location = ?, city = ?, from_location = ?, favourite_travel_destination = ?, 
                 last_holiday_places = ?, favourite_places_to_go = ?, 
                 profile_pic_url = ?, face_photo_url = ?, approval = false
             WHERE id = ?`,
@@ -296,6 +296,7 @@ router.post('/profile', auth, async (req, res) => {
                 formattedDob, 
                 currentLocation || null,
                 city,
+                fromLocation || null,
                 favouriteTravelDestinationJson, // ✅ SWAPPED: Now JSON
                 lastHolidayPlaces || null, // ✅ SWAPPED: Now string
                 favouritePlacesToGoJson, 
