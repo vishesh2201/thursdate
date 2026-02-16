@@ -62,19 +62,24 @@ export default function HomeTab() {
 
           const data = await response.json();
 
-          // Show popup if there's a game and user hasn't played it
-          if (data.hasGame && !data.hasPlayed) {
-            // Delay popup by 1 second for better UX
-            setTimeout(() => {
-              setShowDailyGame(true);
-            }, 1000);
-          }
+          // Only update lastGameDate if we got a valid response with a game
+          if (data.hasGame) {
+            // Update last seen date since we confirmed there's a game today
+            localStorage.setItem('lastGameDate', today);
 
-          // Update last seen date regardless
-          localStorage.setItem('lastGameDate', today);
+            // Show popup if user hasn't played it yet
+            if (!data.hasPlayed) {
+              // Delay popup by 1 second for better UX
+              setTimeout(() => {
+                setShowDailyGame(true);
+              }, 1000);
+            }
+          }
+          // If no game available, don't update lastGameDate so it checks again later
         }
       } catch (error) {
         console.error('Error checking daily game:', error);
+        // Don't update lastGameDate on error so it can retry later
       }
     };
 
@@ -379,11 +384,55 @@ export default function HomeTab() {
               {error}
             </div>
           </div>
-        ) : currentCandidateIndex === -1 || !currentCandidate ? (
-          // No more candidates
-          <div className="flex items-center justify-center h-full">
-            <div className="text-white text-xl text-center px-6">
-              No more profiles to show
+        ) : currentCandidateIndex === -1 ? (
+          // No more candidates - Actionable Empty State
+          <div className="flex items-center justify-center h-full p-6">
+            <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 max-w-sm text-center border border-white/20">
+              <h2 className="text-white text-2xl font-bold mb-3">
+                You're All Caught Up!
+              </h2>
+              <p className="text-white/80 text-base mb-6">
+                You've seen everyone for now. Check back soon for new profiles, or try these:
+              </p>
+
+              <div className="space-y-3">
+                {/* View Matches Button */}
+                <button
+                  onClick={() => setSelected("matches")}
+                  className="w-full bg-white text-gray-900 font-semibold py-3 px-6 rounded-full hover:bg-gray-100 transition flex items-center justify-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                  View Your Matches
+                </button>
+
+                {/* Play Daily Game Button */}
+                <button
+                  onClick={() => setShowDailyGame(true)}
+                  className="w-full bg-white/20 text-white font-semibold py-3 px-6 rounded-full hover:bg-white/30 transition flex items-center justify-center gap-2 backdrop-blur-md border border-white/30"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Play Daily Game
+                </button>
+
+                {/* Refresh Button */}
+                <button
+                  onClick={() => window.location.reload()}
+                  className="w-full bg-white/20 text-white font-semibold py-3 px-6 rounded-full hover:bg-white/30 transition flex items-center justify-center gap-2 backdrop-blur-md border border-white/30"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Check for New Profiles
+                </button>
+              </div>
+
+              <p className="text-white/60 text-sm mt-6">
+                Tip: Expanding your preferences may show you more profiles
+              </p>
             </div>
           </div>
         ) : (

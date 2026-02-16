@@ -128,10 +128,10 @@ export default function DailyGamePopup({ onClose }) {
                         onClick={() => handleOptionSelect(1)}
                         disabled={selectedOption !== null || submitting}
                         className={`flex flex-col items-center transition ${selectedOption === 1
-                                ? 'ring-4 ring-blue-500'
-                                : selectedOption === 2
-                                    ? 'opacity-50'
-                                    : 'hover:scale-105'
+                            ? 'ring-4 ring-blue-500'
+                            : selectedOption === 2
+                                ? 'opacity-50'
+                                : 'hover:scale-105'
                             } ${selectedOption !== null ? 'cursor-default' : 'cursor-pointer'}`}
                     >
                         <div className="w-full aspect-square rounded-xl overflow-hidden mb-2">
@@ -152,10 +152,10 @@ export default function DailyGamePopup({ onClose }) {
                         onClick={() => handleOptionSelect(2)}
                         disabled={selectedOption !== null || submitting}
                         className={`flex flex-col items-center transition ${selectedOption === 2
-                                ? 'ring-4 ring-blue-500'
-                                : selectedOption === 1
-                                    ? 'opacity-50'
-                                    : 'hover:scale-105'
+                            ? 'ring-4 ring-blue-500'
+                            : selectedOption === 1
+                                ? 'opacity-50'
+                                : 'hover:scale-105'
                             } ${selectedOption !== null ? 'cursor-default' : 'cursor-pointer'}`}
                     >
                         <div className="w-full aspect-square rounded-xl overflow-hidden mb-2">
@@ -175,7 +175,7 @@ export default function DailyGamePopup({ onClose }) {
                 {/* Stats summary */}
                 {stats && (
                     <div className="text-center text-sm text-gray-500">
-                        {stats.totalPlays} {stats.totalPlays === 1 ? 'person has' : 'people have'} played today
+                        see who else selected the same answer: see members
                     </div>
                 )}
             </div>
