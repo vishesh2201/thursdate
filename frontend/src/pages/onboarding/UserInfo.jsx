@@ -110,16 +110,13 @@ export default function UserInfo() {
   // ✅ SWAPPED: favouriteTravelDestination is now an array (3+ items)
   const [favouriteTravelDestination, setFavouriteTravelDestination] = useState([]);
   const [currentFavouriteDestinationInput, setCurrentFavouriteDestinationInput] = useState("");
-  const [favouriteDestinationSuggestions, setFavouriteDestinationSuggestions] = useState([]);
 
   // States for tag-based inputs
   // ✅ SWAPPED: lastHolidayPlaces is now a single string
   const [lastHolidayPlaces, setLastHolidayPlaces] = useState("");
   const [lastHolidaySuggestions, setLastHolidaySuggestions] = useState([]);
   const [loadingLastHoliday, setLoadingLastHoliday] = useState(false);
-  const [favouritePlacesToGo, setFavouritePlacesToGo] = useState([]);
-  const [currentFavouritePlaceToGoInput, setCurrentFavouritePlaceToGoInput] = useState("");
-  const [favouritePlaceSuggestions, setFavouritePlaceSuggestions] = useState([]);
+
 
   // Face verification reference photo step state
   const [faceVerificationPic, setFaceVerificationPic] = useState(null);
@@ -156,7 +153,6 @@ export default function UserInfo() {
         if (userData.favouriteTravelDestination) setFavouriteTravelDestination(userData.favouriteTravelDestination);
         // ✅ SWAPPED: lastHolidayPlaces is now a string
         if (userData.lastHolidayPlaces) setLastHolidayPlaces(userData.lastHolidayPlaces);
-        if (userData.favouritePlacesToGo) setFavouritePlacesToGo(userData.favouritePlacesToGo);
         if (userData.faceVerificationUrl) setFaceVerificationUrl(userData.faceVerificationUrl);
 
         // Load saved onboarding state from localStorage (overrides profile data)
@@ -174,7 +170,6 @@ export default function UserInfo() {
           // ✅ SWAPPED: Load array/string correctly
           if (savedState.favouriteTravelDestination) setFavouriteTravelDestination(savedState.favouriteTravelDestination);
           if (savedState.lastHolidayPlaces) setLastHolidayPlaces(savedState.lastHolidayPlaces);
-          if (savedState.favouritePlacesToGo) setFavouritePlacesToGo(savedState.favouritePlacesToGo);
           if (savedState.faceVerificationUrl) setFaceVerificationUrl(savedState.faceVerificationUrl);
         }
       } catch (err) {
@@ -198,11 +193,9 @@ export default function UserInfo() {
   // Debounced values for API calls
   const debouncedCurrentLocation = useDebounce(currentLocation, 500);
   const debouncedFromLocation = useDebounce(fromLocation, 500);
-  // ✅ SWAPPED: Now debounce the input field for favouriteTravelDestination array
-  const debouncedFavouriteDestinationInput = useDebounce(currentFavouriteDestinationInput, 500);
   // ✅ SWAPPED: Now debounce lastHolidayPlaces single string
   const debouncedLastHoliday = useDebounce(lastHolidayPlaces, 500);
-  const debouncedFavouritePlaceInput = useDebounce(currentFavouritePlaceToGoInput, 500);
+
 
   // Effect for current location autocomplete
   useEffect(() => {
@@ -230,17 +223,6 @@ export default function UserInfo() {
     });
   }, [debouncedFromLocation]);
 
-  // ✅ SWAPPED: Effect for favourite destination autocomplete (now for array input)
-  useEffect(() => {
-    if (!debouncedFavouriteDestinationInput || debouncedFavouriteDestinationInput.length < 2) {
-      setFavouriteDestinationSuggestions([]);
-      return;
-    }
-    fetchLocationSuggestions(debouncedFavouriteDestinationInput).then(suggestions => {
-      setFavouriteDestinationSuggestions(suggestions.map(s => s.name));
-    });
-  }, [debouncedFavouriteDestinationInput]);
-
   // ✅ SWAPPED: Effect for autocomplete suggestions for Last Holiday (now single string)
   useEffect(() => {
     if (!debouncedLastHoliday || debouncedLastHoliday.length < 2) {
@@ -254,16 +236,7 @@ export default function UserInfo() {
     });
   }, [debouncedLastHoliday]);
 
-  // Effect for autocomplete suggestions for Favourite Places to Go
-  useEffect(() => {
-    if (!debouncedFavouritePlaceInput || debouncedFavouritePlaceInput.length < 2) {
-      setFavouritePlaceSuggestions([]);
-      return;
-    }
-    fetchLocationSuggestions(debouncedFavouritePlaceInput).then(suggestions => {
-      setFavouritePlaceSuggestions(suggestions.map(s => s.name));
-    });
-  }, [debouncedFavouritePlaceInput]);
+
 
   // Auto-save onboarding state to localStorage whenever key fields change
   // ✅ FIX: Only save after initial loading is complete to avoid race condition
@@ -281,12 +254,11 @@ export default function UserInfo() {
       fromLocation,
       favouriteTravelDestination,
       lastHolidayPlaces,
-      favouritePlacesToGo,
       faceVerificationUrl,
     };
     console.log('[UserInfo] Auto-saving state:', { step, hasData: !!firstName || !!lastName });
     saveOnboardingState(STORAGE_KEYS.USER_INFO, state);
-  }, [initialLoading, step, firstName, lastName, gender, customGender, dob, currentLocation, fromLocation, favouriteTravelDestination, lastHolidayPlaces, favouritePlacesToGo, faceVerificationUrl]);
+  }, [initialLoading, step, firstName, lastName, gender, customGender, dob, currentLocation, fromLocation, favouriteTravelDestination, lastHolidayPlaces, faceVerificationUrl]);
 
   // Adjust pickerDay if month/year changes and the day becomes invalid
   const updatePickerDayBasedOnMonthYear = useCallback((year, month, day) => {
@@ -298,11 +270,11 @@ export default function UserInfo() {
   }, []);
 
   // Total logical steps for the progress bar
-  const totalSteps = 9;
+  const totalSteps = 8;
   const progress = (step / totalSteps) * 100;
 
   const handleNext = async () => {
-    if (step === 9 && faceVerificationUrl) {
+    if (step === 8 && faceVerificationUrl) {
       // Save user info to backend (including faceVerificationUrl for verification)
       try {
         await userAPI.saveProfile({
@@ -314,7 +286,6 @@ export default function UserInfo() {
           fromLocation,
           favouriteTravelDestination,
           lastHolidayPlaces,
-          favouritePlacesToGo,
           faceVerificationUrl, // Stored for later face matching verification
         });
         // Clear saved onboarding state on successful completion
@@ -390,7 +361,6 @@ export default function UserInfo() {
       const { name, details } = parsePlaceInput(currentFavouriteDestinationInput);
       setFavouriteTravelDestination(prev => [...prev, { id: Date.now(), name, details }]);
       setCurrentFavouriteDestinationInput("");
-      setFavouriteDestinationSuggestions([]);
     }
   };
 
@@ -398,29 +368,7 @@ export default function UserInfo() {
     setFavouriteTravelDestination(prev => prev.filter(place => place.id !== id));
   };
 
-  const handleFavouriteDestinationSuggestionClick = (suggestion) => {
-    setCurrentFavouriteDestinationInput(suggestion);
-    setFavouriteDestinationSuggestions([]);
-  };
 
-  // Handlers for Favourite Places to Go (Step 7)
-  const handleAddFavouritePlaceToGo = (e) => {
-    if (e.key === 'Enter' && currentFavouritePlaceToGoInput.trim() !== '') {
-      const { name, details } = parsePlaceInput(currentFavouritePlaceToGoInput);
-      setFavouritePlacesToGo(prev => [...prev, { id: Date.now(), name, details }]);
-      setCurrentFavouritePlaceToGoInput("");
-      setFavouritePlaceSuggestions([]);
-    }
-  };
-
-  const handleRemoveFavouritePlaceToGo = (id) => {
-    setFavouritePlacesToGo(prev => prev.filter(place => place.id !== id));
-  };
-
-  const handleFavouritePlaceSuggestionClick = (suggestion) => {
-    setCurrentFavouritePlaceToGoInput(suggestion);
-    setFavouritePlaceSuggestions([]);
-  };
 
   // Validation for each step's input fields
   const isStepOneValid = firstName.trim() && lastName.trim();
@@ -442,8 +390,7 @@ export default function UserInfo() {
   const isStepSixValid = favouriteTravelDestination.length >= 3;
   // ✅ SWAPPED: lastHolidayPlaces now needs to be a non-empty string
   const isStepSevenValid = lastHolidayPlaces.trim();
-  const isStepEightValid = favouritePlacesToGo.length >= 3;
-  const isStepNineValid = !!faceVerificationUrl;
+  const isStepEightValid = !!faceVerificationUrl;
 
   const getNextButtonDisabled = () => {
     switch (step) {
@@ -455,7 +402,6 @@ export default function UserInfo() {
       case 6: return !isStepSixValid;
       case 7: return !isStepSevenValid;
       case 8: return !isStepEightValid;
-      case 9: return !isStepNineValid;
       default: return true;
     }
   };
@@ -861,11 +807,11 @@ export default function UserInfo() {
           {step === 6 && (
             <div className="flex flex-col flex-grow">
               <h1 className="text-xl font-semibold mb-4 text-white drop-shadow-md">What are your three favourite travel destinations?</h1>
-              <p className={`text-sm mb-6 ${isStepFiveValid ? 'text-white/70' : 'text-red-300'}`}>
-                {isStepFiveValid ? 'Great! You can add more if you like.' : 'Enter minimum 3 destinations'}
+              <p className={`text-sm mb-6 ${isStepSixValid ? 'text-white/70' : 'text-red-300'}`}>
+                {isStepSixValid ? 'Great! You can add more if you like.' : 'Enter minimum 3 destinations'}
               </p>
 
-              {/* Input for new tags with autocomplete - MOVED TO TOP */}
+              {/* Input for new tags - manual entry only */}
               <div className="relative mb-4">
                 <input
                   type="text"
@@ -877,27 +823,11 @@ export default function UserInfo() {
                 />
                 {currentFavouriteDestinationInput && (
                   <button
-                    onClick={() => {
-                      setCurrentFavouriteDestinationInput("");
-                      setFavouriteDestinationSuggestions([]);
-                    }}
+                    onClick={() => setCurrentFavouriteDestinationInput("")}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 text-lg transition"
                   >
                     ×
                   </button>
-                )}
-                {favouriteDestinationSuggestions.length > 0 && (
-                  <ul className="absolute z-20 w-full bg-white/40 backdrop-blur-lg border border-white/40 rounded-xl mt-1 max-h-40 overflow-y-auto shadow-xl">
-                    {favouriteDestinationSuggestions.map((suggestion, index) => (
-                      <li
-                        key={index}
-                        onClick={() => handleFavouriteDestinationSuggestionClick(suggestion)}
-                        className="px-4 py-2 text-sm text-white hover:bg-white/20 cursor-pointer transition"
-                      >
-                        {suggestion}
-                      </li>
-                    ))}
-                  </ul>
                 )}
               </div>
 
@@ -1000,91 +930,8 @@ export default function UserInfo() {
             </div>
           )}
 
-          {/* Step 8: Favourite Places to Go To - Tag Input with Autocomplete */}
+          {/* Step 8: Face Verification Reference Photo */}
           {step === 8 && (
-            <div className="flex flex-col flex-grow">
-              <h1 className="text-xl font-semibold mb-4 text-white drop-shadow-md">What are your three favourite places to go to?</h1>
-              <p className={`text-sm mb-6 ${isStepEightValid ? 'text-white/70' : 'text-red-300'}`}>
-                {isStepEightValid ? 'Perfect! Time for the final step.' : 'Enter minimum 3 places'}
-              </p>
-
-              {/* Input for new tags with autocomplete - MOVED TO TOP */}
-              <div className="relative mb-4">
-                <input
-                  type="text"
-                  value={currentFavouritePlaceToGoInput}
-                  onChange={(e) => setCurrentFavouritePlaceToGoInput(e.target.value)}
-                  onKeyDown={handleAddFavouritePlaceToGo}
-                  placeholder="Type a place & press Enter (e.g., Paris)"
-                  className={`w-full px-4 py-3 border rounded-xl text-sm pr-10 ${INPUT_GLASS}`}
-                />
-                {currentFavouritePlaceToGoInput && (
-                  <button
-                    onClick={() => {
-                      setCurrentFavouritePlaceToGoInput("");
-                      setFavouritePlaceSuggestions([]);
-                    }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 text-lg transition"
-                  >
-                    ×
-                  </button>
-                )}
-                {favouritePlaceSuggestions.length > 0 && (
-                  <ul className="absolute z-20 w-full bg-white/40 backdrop-blur-lg border border-white/40 rounded-xl mt-1 max-h-40 overflow-y-auto shadow-xl">
-                    {favouritePlaceSuggestions.map((suggestion, index) => (
-                      <li
-                        key={index}
-                        onClick={() => handleFavouritePlaceSuggestionClick(suggestion)}
-                        className="px-4 py-2 text-sm text-white hover:bg-white/20 cursor-pointer transition"
-                      >
-                        {suggestion}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              {/* Display existing tags - MOVED BELOW INPUT */}
-              <div className="flex flex-wrap gap-2 mb-auto max-h-40 overflow-y-auto">
-                {favouritePlacesToGo.map((place) => (
-                  <div
-                    key={place.id}
-                    className="px-4 py-2 rounded-full flex items-center text-sm shadow-md"
-                    style={{
-                      borderRadius: '50px',
-                      background: 'rgba(0, 0, 0, 0.50)',
-                      border: '1px solid rgba(255, 255, 255, 0.40)',
-                      flex: '0 0 calc(50% - 0.25rem)', // Makes 2 per row with gap
-                      minWidth: '150', // Prevents overflow
-                    }}
-                  >
-                    <span className="text-white truncate">{place.name}</span>
-                    {place.details && (
-                      <span className="text-white/80 ml-1 text-xs truncate">({place.details})</span>
-                    )}
-                    <button
-                      onClick={() => handleRemoveFavouritePlaceToGo(place.id)}
-                      className="ml-2 text-white/80 hover:text-white transition flex-shrink-0"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              <button
-                disabled={getNextButtonDisabled()}
-                onClick={handleNext}
-                className={`w-full py-4 rounded-[9999px] font-medium text-lg transition mt-6 ${getNextButtonDisabled() ? BUTTON_GLASS_INACTIVE : BUTTON_GLASS_ACTIVE
-                  }`}
-              >
-                {getNextButtonText()}
-              </button>
-            </div>
-          )}
-
-          {/* Step 9: Face Verification Reference Photo */}
-          {step === 9 && (
             <div className="flex flex-col flex-grow items-center">
               <h1 className="text-xl font-semibold mb-2 text-white drop-shadow-md">Face Verification - Step 1</h1>
               <p className="text-sm text-white/70 mb-6 text-center">Upload a clear photo of your face for verification.</p>

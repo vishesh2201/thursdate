@@ -269,14 +269,12 @@ router.post('/profile', auth, async (req, res) => {
 
         const {
             firstName, lastName, gender, dob, currentLocation, fromLocation, favouriteTravelDestination,
-            lastHolidayPlaces, favouritePlacesToGo, profilePicUrl, faceVerificationUrl
+            lastHolidayPlaces, profilePicUrl, faceVerificationUrl
         } = req.body;
         
         let formattedDob = dob ? new Date(dob).toISOString().split('T')[0] : null;
         // ✅ SWAPPED: favouriteTravelDestination is now JSON array
         const favouriteTravelDestinationJson = JSON.stringify(favouriteTravelDestination || []);
-        // ✅ SWAPPED: lastHolidayPlaces is now a string (no JSON.stringify)
-        const favouritePlacesToGoJson = JSON.stringify(favouritePlacesToGo || []);
         
         // Extract city from currentLocation
         const city = currentLocation ? extractCity(currentLocation) : null;
@@ -286,7 +284,7 @@ router.post('/profile', auth, async (req, res) => {
             `UPDATE users SET 
                 first_name = ?, last_name = ?, gender = ?, dob = ?, 
                 current_location = ?, city = ?, from_location = ?, favourite_travel_destination = ?, 
-                last_holiday_places = ?, favourite_places_to_go = ?, 
+                last_holiday_places = ?, 
                 profile_pic_url = ?, face_photo_url = ?, approval = false
             WHERE id = ?`,
             [
@@ -297,9 +295,8 @@ router.post('/profile', auth, async (req, res) => {
                 currentLocation || null,
                 city,
                 fromLocation || null,
-                favouriteTravelDestinationJson, // ✅ SWAPPED: Now JSON
-                lastHolidayPlaces || null, // ✅ SWAPPED: Now string
-                favouritePlacesToGoJson, 
+                favouriteTravelDestinationJson,
+                lastHolidayPlaces || null,
                 profilePicUrl || null, 
                 faceVerificationUrl || null,
                 req.user.userId

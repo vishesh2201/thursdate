@@ -29,13 +29,13 @@ class ProfileLevelService {
         ],
         LEVEL_2: [
             'pets', 'drinking', 'smoking', 'height', 
-            'foodPreference', 'religiousLevel'
+            'foodPreference'
         ],
         LEVEL_3: [
             'kidsPreference', 'facePhotos', 
             'favouriteTravelDestination', 'lastHolidayPlaces',
             'favouritePlacesToGo', 'instagram', 'linkedin',
-            'religion', 'relationshipValues'
+            'religiousLevel', 'religion', 'relationshipValues'
         ]
     };
 
