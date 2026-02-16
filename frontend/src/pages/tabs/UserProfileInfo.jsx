@@ -767,12 +767,16 @@ export default function UserProfileInfo() {
                                         
                                         {/* Title */}
                                         <h3 className="font-['Poppins'] font-semibold text-[20px] leading-[1.3] text-white mb-3">
-                                            Personal Photos Locked
+                                            Personal Tab Locked
                                         </h3>
                                         
                                         {/* Message */}
-                                        <p className="font-['Poppins'] text-[14px] leading-[1.5] text-white/80 mb-2">
-                                            Unlock Level 3 for seeing personal photos
+                                        <p className="font-['Poppins'] text-[14px] leading-[1.5] text-white/80 mb-4">
+                                            The Personal tab unlocks at <span className="font-semibold text-white">Level 3</span> once you start chatting with this match
+                                        </p>
+                                        
+                                        <p className="font-['Poppins'] text-[13px] leading-[1.4] text-white/60">
+                                            Exchange messages and build connection to unlock personal photos
                                         </p>
                                         
                                         {/* Progress Indicator */}
@@ -781,7 +785,7 @@ export default function UserProfileInfo() {
                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                                                 </svg>
-                                                <span>Keep chatting to unlock</span>
+                                                <span>Start your conversation to progress</span>
                                             </div>
                                         </div>
                                     </div>

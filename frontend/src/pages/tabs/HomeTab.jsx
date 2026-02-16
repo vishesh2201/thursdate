@@ -38,6 +38,9 @@ export default function HomeTab() {
   // Daily game popup state
   const [showDailyGame, setShowDailyGame] = useState(false);
 
+  // No match chat attempt popup state
+  const [showNoMatchPopup, setShowNoMatchPopup] = useState(false);
+
   // Check if user should see daily game (once per day)
   useEffect(() => {
     const checkDailyGame = async () => {
@@ -291,10 +294,11 @@ export default function HomeTab() {
     if (!isMinimized) return;
     if (!currentCandidate) return;
 
-    // Get current images based on view mode
-    const currentImages = viewMode === "lifestyle"
-      ? currentCandidate.lifestyleImages
-      : currentCandidate.personalImages;
+    // Don't cycle images on personal tab (it's locked)
+    if (viewMode === "personal") return;
+
+    // Get lifestyle images only
+    const currentImages = currentCandidate.lifestyleImages;
 
     if (!currentImages || currentImages.length === 0) return;
 
@@ -305,7 +309,12 @@ export default function HomeTab() {
   };
 
   const handleGoToChat = async () => {
-    if (!matchedUser) return;
+    // Check if there's a mutual match
+    if (!matchedUser) {
+      // Show friendly popup explaining they need to match first
+      setShowNoMatchPopup(true);
+      return;
+    }
 
     try {
       // Get conversation with matched user (already created during match)
@@ -344,9 +353,12 @@ export default function HomeTab() {
         style={{
           backgroundImage: (() => {
             if (!currentCandidate) return 'url(/bgs/matchesbg.jpg)';
-            const currentImages = viewMode === "lifestyle"
-              ? currentCandidate.lifestyleImages
-              : currentCandidate.personalImages;
+            // For personal tab, show blurred lifestyle image or default background
+            if (viewMode === "personal") {
+              return 'url(/bgs/matchesbg.jpg)';
+            }
+            // For lifestyle tab, show lifestyle images
+            const currentImages = currentCandidate.lifestyleImages;
             return currentImages && currentImages.length > 0
               ? `url(${currentImages[currentLifestyleImageIndex]})`
               : 'url(/bgs/matchesbg.jpg)';
@@ -425,11 +437,9 @@ export default function HomeTab() {
           </div>
         ) : (
           <>
-            {/* Lifestyle/Personal Image Indicators */}
-            {(() => {
-              const currentImages = viewMode === "lifestyle"
-                ? currentCandidate.lifestyleImages
-                : currentCandidate.personalImages;
+            {/* Lifestyle Image Indicators - only show on lifestyle tab */}
+            {viewMode === "lifestyle" && currentCandidate && (() => {
+              const currentImages = currentCandidate.lifestyleImages;
               return currentImages && currentImages.length > 1 && (
                 <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex gap-2 z-10">
                   {currentImages.map((_, idx) => (
@@ -479,6 +489,25 @@ export default function HomeTab() {
               )}
               <div style={{ width: 40 }}></div>
             </div>
+
+            {/* Personal Tab Locked Banner - Show when minimized */}
+            {isMinimized && viewMode === "personal" && (
+              <div className="px-4 mb-4">
+                <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/30 text-center">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                    </svg>
+                    <h3 className="font-['Poppins'] font-semibold text-[16px] text-white">
+                      Personal Tab Locked
+                    </h3>
+                  </div>
+                  <p className="font-['Poppins'] text-[13px] leading-[1.4] text-white/80">
+                    Unlocks at <span className="font-semibold text-white">Level 3</span> after matching and chatting
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Action Buttons - Draggable */}
             <div
@@ -542,7 +571,44 @@ export default function HomeTab() {
                 onClick={() => isMinimized && setIsMinimized(false)}
               >
 
-
+                {/* Show Personal Tab Locked Message when Personal tab is selected */}
+                {viewMode === "personal" ? (
+                  <div className="flex flex-col items-center justify-center py-20 px-6 h-full">
+                    <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/30 max-w-sm text-center">
+                      {/* Lock Icon */}
+                      <div className="w-20 h-20 mx-auto mb-6 bg-white/20 rounded-full flex items-center justify-center">
+                        <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      
+                      {/* Title */}
+                      <h3 className="font-['Poppins'] font-semibold text-[20px] leading-[1.3] text-white mb-3">
+                        Personal Tab Locked
+                      </h3>
+                      
+                      {/* Message */}
+                      <p className="font-['Poppins'] text-[14px] leading-[1.5] text-white/80 mb-4">
+                        The Personal tab unlocks at <span className="font-semibold text-white">Level 3</span> after you match and start chatting
+                      </p>
+                      
+                      <p className="font-['Poppins'] text-[13px] leading-[1.4] text-white/60">
+                        Match with this person to unlock personal photos and connect deeper
+                      </p>
+                      
+                      {/* Progress Indicator */}
+                      <div className="mt-6 pt-6 border-t border-white/20">
+                        <div className="flex items-center justify-center gap-2 text-white/60 text-xs">
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+                          </svg>
+                          <span>Swipe right to match</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
                 {/* Profile Header */}
                 <div className="flex items-start gap-4 mb-6">
                   <div className="relative">
@@ -673,13 +739,13 @@ export default function HomeTab() {
                     )}
                   </div>
                 )}
+                  </>
+                )}
               </div>
             </div>
           </>
         )}
       </div>
-
-      {/* Match Notification Modal */}
       {showMatchNotification && matchedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md">
           <div className="bg-gradient-to-br from-purple-600 to-pink-600 rounded-3xl p-8 mx-6 max-w-sm shadow-2xl animate-bounce-once">
@@ -706,6 +772,49 @@ export default function HomeTab() {
                   Send Message
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* No Match Chat Popup - Friendly bottom sheet */}
+      {showNoMatchPopup && (
+        <div 
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm"
+          onClick={() => setShowNoMatchPopup(false)}
+        >
+          <div 
+            className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-t-3xl p-6 mx-0 w-full max-w-md shadow-2xl animate-slide-up border-t-2 border-purple-500"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-center">
+              {/* Drag indicator */}
+              <div className="w-12 h-1 bg-white/30 rounded-full mx-auto mb-6"></div>
+              
+              {/* Icon */}
+              <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              </div>
+              
+              {/* Title */}
+              <h3 className="text-white text-xl font-bold mb-3">
+                Match First to Chat! 💬
+              </h3>
+              
+              {/* Message */}
+              <p className="text-white/80 text-base leading-relaxed mb-6">
+                You can start chatting once you both match. Send a like and wait for them to like you back!
+              </p>
+              
+              {/* Action Button */}
+              <button
+                onClick={() => setShowNoMatchPopup(false)}
+                className="w-full px-6 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full font-semibold hover:from-purple-600 hover:to-pink-600 transition-all shadow-lg"
+              >
+                Got it!
+              </button>
             </div>
           </div>
         </div>
