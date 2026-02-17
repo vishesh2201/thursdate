@@ -129,7 +129,7 @@ app.set('io', io);
 // Root endpoint
 app.get('/', (req, res) => {
   res.status(200).json({ 
-    message: 'Thursdate API Server',
+    message: 'Sundate API Server',
     status: 'running',
     timestamp: new Date().toISOString()
   });

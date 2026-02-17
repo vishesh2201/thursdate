@@ -46,16 +46,16 @@ class EmailService {
       const msg = {
         to: email,
         from: {
-          email: process.env.SENDGRID_FROM_EMAIL || 'noreply@thursdate.app',
-          name: 'Thursdate'
+          email: process.env.SENDGRID_FROM_EMAIL || 'noreply@sundatetheapp.com',
+          name: 'Sundate'
         },
         replyTo: process.env.SENDGRID_FROM_EMAIL || 'sundatetheapp@gmail.com',
-        subject: 'Your Thursdate Verification Code',
+        subject: 'Your Sundate Verification Code',
         // Plain text version (important for spam filters)
         text: `
 Hello,
 
-Thank you for signing up with Thursdate! 
+Thank you for signing up with Sundate! 
 
 Your verification code is: ${otp}
 
@@ -64,9 +64,9 @@ This code will expire in 10 minutes.
 If you didn't request this code, please ignore this email.
 
 Best regards,
-Thursdate Team
+Sundate Team
 
-© ${new Date().getFullYear()} Thursdate. All rights reserved.
+© ${new Date().getFullYear()} Sundate. All rights reserved.
         `.trim(),
         // HTML version (simpler design, less likely to trigger spam filters)
         html: `
@@ -75,7 +75,7 @@ Thursdate Team
           <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Thursdate Verification Code</title>
+            <title>Sundate Verification Code</title>
           </head>
           <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;">
             <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f5f5f5; padding: 20px 0;">
@@ -85,14 +85,14 @@ Thursdate Team
                     <!-- Header -->
                     <tr>
                       <td style="background-color: #6366f1; padding: 40px 20px; text-align: center;">
-                        <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">Thursdate</h1>
+                        <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">Sundate</h1>
                       </td>
                     </tr>
                     <!-- Content -->
                     <tr>
                       <td style="padding: 40px 30px;">
                         <p style="margin: 0 0 20px; color: #333333; font-size: 16px; line-height: 1.5;">Hello,</p>
-                        <p style="margin: 0 0 30px; color: #333333; font-size: 16px; line-height: 1.5;">Thank you for signing up with Thursdate! Please use the following verification code to complete your email verification:</p>
+                        <p style="margin: 0 0 30px; color: #333333; font-size: 16px; line-height: 1.5;">Thank you for signing up with Sundate! Please use the following verification code to complete your email verification:</p>
                         
                         <!-- OTP Box -->
                         <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 30px 0;">
@@ -110,7 +110,7 @@ Thursdate Team
                     <!-- Footer -->
                     <tr>
                       <td style="background-color: #f8f9fa; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
-                        <p style="margin: 0; color: #666666; font-size: 12px;">© ${new Date().getFullYear()} Thursdate. All rights reserved.</p>
+                        <p style="margin: 0; color: #666666; font-size: 12px;">© ${new Date().getFullYear()} Sundate. All rights reserved.</p>
                       </td>
                     </tr>
                   </table>

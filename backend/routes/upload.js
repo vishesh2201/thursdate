@@ -355,7 +355,7 @@ router.post('/voice-message', auth, audioUpload.single('audio'), async (req, res
 
     // Upload to Cloudinary as video (Cloudinary handles audio as video)
     const result = await cloudinary.uploader.upload(dataURI, {
-      folder: 'thursdate/voice-messages',
+      folder: 'sundate/voice-messages',
       public_id: `user_${req.user.userId}_voice_${Date.now()}`,
       resource_type: 'video'
     });
