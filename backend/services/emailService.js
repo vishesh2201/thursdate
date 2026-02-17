@@ -46,74 +46,141 @@ class EmailService {
       const msg = {
         to: email,
         from: {
-          email: process.env.SENDGRID_FROM_EMAIL || 'noreply@sundatetheapp.com',
+          email: 'no-reply@sundatetheapp.com',
           name: 'Sundate'
         },
-        replyTo: process.env.SENDGRID_FROM_EMAIL || 'sundatetheapp@gmail.com',
-        subject: 'Your Sundate Verification Code',
+        replyTo: {
+          email: 'support@sundatetheapp.com',
+          name: 'Sundate Support'
+        },
+        subject: 'Complete your Sundate account verification',
         // Plain text version (important for spam filters)
         text: `
-Hello,
+Hi there,
 
-Thank you for signing up with Sundate! 
+Welcome to Sundate! We're excited to have you join our community.
 
-Your verification code is: ${otp}
+To complete your account setup and start connecting with others, please verify your email address using the code below:
 
-This code will expire in 10 minutes.
+Your verification code: ${otp}
 
-If you didn't request this code, please ignore this email.
+This code is valid for the next 10 minutes for security purposes.
+
+Why did I receive this?
+You (or someone using your email) started creating a Sundate account. If this wasn't you, you can safely ignore this email - no account has been created yet.
+
+Need help?
+If you have any questions or need assistance, our support team is here to help at support@sundatetheapp.com
 
 Best regards,
-Sundate Team
+The Sundate Team
 
+---
+Sundate - Meaningful connections, one date at a time
 © ${new Date().getFullYear()} Sundate. All rights reserved.
+
+This is an automated message. Please do not reply to this email.
         `.trim(),
-        // HTML version (simpler design, less likely to trigger spam filters)
+        // HTML version (well-structured for better deliverability)
         html: `
           <!DOCTYPE html>
           <html lang="en">
           <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Sundate Verification Code</title>
+            <meta name="color-scheme" content="light">
+            <meta name="supported-color-schemes" content="light">
+            <title>Verify Your Sundate Account</title>
           </head>
-          <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;">
-            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f5f5f5; padding: 20px 0;">
+          <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f7f8fa; line-height: 1.6;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f7f8fa; padding: 40px 20px;">
               <tr>
                 <td align="center">
-                  <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                    <!-- Header -->
+                  <!-- Main Container -->
+                  <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.07);">
+                    
+                    <!-- Header with Logo/Brand -->
                     <tr>
-                      <td style="background-color: #6366f1; padding: 40px 20px; text-align: center;">
-                        <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">Sundate</h1>
+                      <td style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 32px 40px; text-align: center;">
+                        <h1 style="margin: 0; color: #ffffff; font-size: 32px; font-weight: 700; letter-spacing: -0.5px;">Sundate</h1>
+                        <p style="margin: 8px 0 0; color: rgba(255,255,255,0.9); font-size: 14px;">Meaningful connections, one date at a time</p>
                       </td>
                     </tr>
-                    <!-- Content -->
+                    
+                    <!-- Main Content -->
                     <tr>
-                      <td style="padding: 40px 30px;">
-                        <p style="margin: 0 0 20px; color: #333333; font-size: 16px; line-height: 1.5;">Hello,</p>
-                        <p style="margin: 0 0 30px; color: #333333; font-size: 16px; line-height: 1.5;">Thank you for signing up with Sundate! Please use the following verification code to complete your email verification:</p>
+                      <td style="padding: 48px 40px 32px;">
+                        <h2 style="margin: 0 0 16px; color: #1f2937; font-size: 24px; font-weight: 600;">Welcome to Sundate!</h2>
+                        <p style="margin: 0 0 24px; color: #4b5563; font-size: 16px; line-height: 1.6;">We're excited to have you join our community. To complete your account setup and start connecting with others, please verify your email address.</p>
                         
-                        <!-- OTP Box -->
-                        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 30px 0;">
+                        <!-- Verification Code Box -->
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 32px 0;">
                           <tr>
-                            <td align="center" style="background-color: #f8f9fa; border: 2px solid #6366f1; border-radius: 8px; padding: 30px;">
-                              <span style="font-size: 32px; font-weight: bold; color: #6366f1; letter-spacing: 8px;">${otp}</span>
+                            <td align="center" style="background-color: #f9fafb; border: 2px dashed #6366f1; border-radius: 12px; padding: 32px 20px;">
+                              <p style="margin: 0 0 12px; color: #6b7280; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Your Verification Code</p>
+                              <div style="font-size: 36px; font-weight: 700; color: #6366f1; letter-spacing: 6px; font-family: 'Courier New', monospace;">${otp}</div>
+                              <p style="margin: 16px 0 0; color: #6b7280; font-size: 13px;">Valid for 10 minutes</p>
                             </td>
                           </tr>
                         </table>
                         
-                        <p style="margin: 20px 0 0; color: #333333; font-size: 16px; line-height: 1.5;"><strong>This code will expire in 10 minutes.</strong></p>
-                        <p style="margin: 20px 0 0; color: #666666; font-size: 14px; line-height: 1.5;">If you didn't request this code, please ignore this email.</p>
+                        <!-- Security Info Box -->
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 24px 0; background-color: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 6px;">
+                          <tr>
+                            <td style="padding: 16px 20px;">
+                              <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.5;">
+                                <strong>🔒 Security Tip:</strong> Never share this code with anyone. Sundate staff will never ask for your verification code.
+                              </p>
+                            </td>
+                          </tr>
+                        </table>
+                        
+                        <p style="margin: 32px 0 0; color: #6b7280; font-size: 14px; line-height: 1.6;">If you didn't request this code, you can safely ignore this email. No account has been created yet.</p>
                       </td>
                     </tr>
+                    
+                    <!-- Help Section -->
+                    <tr>
+                      <td style="padding: 0 40px 32px;">
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f9fafb; border-radius: 8px;">
+                          <tr>
+                            <td style="padding: 24px;">
+                              <p style="margin: 0 0 8px; color: #374151; font-size: 15px; font-weight: 600;">Need help?</p>
+                              <p style="margin: 0; color: #6b7280; font-size: 14px; line-height: 1.5;">
+                                Our support team is here to assist you at 
+                                <a href="mailto:support@sundatetheapp.com" style="color: #6366f1; text-decoration: none; font-weight: 500;">support@sundatetheapp.com</a>
+                              </p>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                    
                     <!-- Footer -->
                     <tr>
-                      <td style="background-color: #f8f9fa; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
-                        <p style="margin: 0; color: #666666; font-size: 12px;">© ${new Date().getFullYear()} Sundate. All rights reserved.</p>
+                      <td style="background-color: #f9fafb; padding: 32px 40px; text-align: center; border-top: 1px solid #e5e7eb;">
+                        <p style="margin: 0 0 8px; color: #9ca3af; font-size: 13px; line-height: 1.5;">
+                          This is an automated message from Sundate. Please do not reply to this email.
+                        </p>
+                        <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                          © ${new Date().getFullYear()} Sundate. All rights reserved.
+                        </p>
+                      </td>
+                    </tr>
+                    
+                  </table>
+                  
+                  <!-- Spacing -->
+                  <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px;">
+                    <tr>
+                      <td style="padding: 24px 0; text-align: center;">
+                        <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                          You're receiving this because you started creating a Sundate account.
+                        </p>
                       </td>
                     </tr>
                   </table>
+                  
                 </td>
               </tr>
             </table>
@@ -129,7 +196,15 @@ Sundate Team
           bypassListManagement: { enable: false },
           footer: { enable: false },
           sandboxMode: { enable: false }
-        }
+        },
+        // Add custom headers for better deliverability
+        headers: {
+          'X-Entity-Ref-ID': `otp-${Date.now()}-${email}`,
+          'X-Priority': '1',
+          'Importance': 'high'
+        },
+        // Category for SendGrid analytics (helps with reputation)
+        categories: ['authentication', 'otp-verification']
       };
 
       await sgMail.send(msg);
