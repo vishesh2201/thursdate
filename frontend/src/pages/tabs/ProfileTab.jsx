@@ -107,10 +107,13 @@ export default function ProfileTab() {
         relationshipValues: userInfo?.intent?.profileQuestions?.relationshipValues?.[0] || '',
       });
     } else if (section === 'deepDive') {
+      // Convert favouriteTravelDestination array to string for editing
+      const favDestString = Array.isArray(userInfo?.favouriteTravelDestination)
+        ? userInfo.favouriteTravelDestination.map(d => d.name).join(', ')
+        : userInfo?.favouriteTravelDestination || '';
+
       setEditFormData({
-        favouriteTravelDestination: Array.isArray(userInfo?.favouriteTravelDestination) 
-          ? userInfo.favouriteTravelDestination.map(d => d.name || d).join(', ') 
-          : (userInfo?.favouriteTravelDestination || ''),
+        favouriteTravelDestination: favDestString,
         kidsPreference: userInfo?.kidsPreference || '',
         religiousLevel: userInfo?.religiousLevel || '',
         religion: userInfo?.intent?.profileQuestions?.religion || '',
@@ -217,13 +220,17 @@ export default function ProfileTab() {
           },
         };
       } else if (editingSection === 'deepDive') {
-        // Convert comma-separated string back to array format for favouriteTravelDestination
-        const destinations = editFormData.favouriteTravelDestination
-          ? editFormData.favouriteTravelDestination.split(',').map(d => d.trim()).filter(d => d)
+        // Convert comma-separated string to array of objects for favouriteTravelDestination
+        const favDestArray = editFormData.favouriteTravelDestination
+          ? editFormData.favouriteTravelDestination
+            .split(',')
+            .map(dest => dest.trim())
+            .filter(dest => dest.length > 0)
+            .map(dest => ({ id: Date.now() + Math.random(), name: dest, details: '' }))
           : [];
-        
+
         updateData = {
-          favouriteTravelDestination: destinations,
+          favouriteTravelDestination: favDestArray,
           kidsPreference: editFormData.kidsPreference,
           religiousLevel: editFormData.religiousLevel,
           intent: {
@@ -1671,10 +1678,10 @@ export default function ProfileTab() {
                 </button>
               </div>
             ) : (
-              ((Array.isArray(userInfo?.favouriteTravelDestination) && userInfo.favouriteTravelDestination.length > 0) || 
-               userInfo?.kidsPreference || 
-               userInfo?.religiousLevel || 
-               userInfo?.intent?.profileQuestions?.livingSituation) && (
+              ((Array.isArray(userInfo?.favouriteTravelDestination) && userInfo.favouriteTravelDestination.length > 0) ||
+                userInfo?.kidsPreference ||
+                userInfo?.religiousLevel ||
+                userInfo?.intent?.profileQuestions?.livingSituation) && (
                 <div className="mb-4">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-white text-base font-semibold">Deep Dive</h3>
@@ -1688,7 +1695,7 @@ export default function ProfileTab() {
 
                   <div className="bg-white/20 backdrop-blur-lg rounded-2xl p-4 border border-white/30">
                     <div className="space-y-3">
-                      {(Array.isArray(userInfo?.favouriteTravelDestination) && userInfo.favouriteTravelDestination.length > 0) && (
+                      {userInfo?.favouriteTravelDestination && Array.isArray(userInfo.favouriteTravelDestination) && userInfo.favouriteTravelDestination.length > 0 && (
                         <div className="flex items-start gap-3">
                           <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center flex-shrink-0 border border-white/30">
                             <img src="/profileFavDestination.svg" alt="Destination" className="w-4 h-4" />
@@ -1696,12 +1703,13 @@ export default function ProfileTab() {
                           <div>
                             <div className="text-white/70 text-xs">Favorite Destination</div>
                             <div className="text-white font-medium text-sm">
-                              {Array.isArray(userInfo.favouriteTravelDestination) 
-                                ? userInfo.favouriteTravelDestination
-                                    .map(d => typeof d === 'string' ? d : (d?.name || ''))
-                                    .filter(Boolean)
-                                    .join(', ') 
-                                : userInfo.favouriteTravelDestination}
+                              {userInfo.favouriteTravelDestination.map((dest, idx) => (
+                                <span key={dest.id || idx}>
+                                  {dest.name}
+                                  {dest.details && ` - ${dest.details}`}
+                                  {idx < userInfo.favouriteTravelDestination.length - 1 && ', '}
+                                </span>
+                              ))}
                             </div>
                           </div>
                         </div>

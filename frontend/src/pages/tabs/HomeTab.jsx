@@ -387,7 +387,7 @@ export default function HomeTab() {
               {error}
             </div>
           </div>
-        ) : currentCandidateIndex === -1 ? (
+        ) : !currentCandidate || candidates.length === 0 || currentCandidateIndex === -1 ? (
           // No more candidates - Actionable Empty State
           <div className="flex items-center justify-center h-full p-6">
             <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 max-w-sm text-center border border-white/20">
